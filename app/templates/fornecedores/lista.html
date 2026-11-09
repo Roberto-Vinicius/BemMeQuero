@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, kpi_card %}
+{% block titulo %}Fornecedores{% endblock %}
+{% block titulo_pagina %}Gestão de fornecedores{% endblock %}
+{% block conteudo %}
+{% set k = kpis|default({'total': fornecedores|length, 'ativos': fornecedores|selectattr('ativo')|list|length, 'inativos': 0, 'lotes': 0}) %}
+
+<div x-data="{ modalImportar: false }">
+  <!-- 4 KPIs de Fornecedores (T08 - s11.png) -->
+  <div class="bmq-kpi-grid" style="margin-bottom:24px;">
+    {{ kpi_card("Total de fornecedores", k.total, "fornecedores", "rosa", "Parceiros comerciais cadastrados", "neutro") }}
+    {{ kpi_card("Fornecedores ativos", k.ativos, "confirmado", "sucesso", "Habilitados para compras", "positivo") }}
+    {{ kpi_card("Fornecedores inativos", k.inativos, "relogio", "dourado", "Cadastros suspensos", "neutro") }}
+    {{ kpi_card("Lotes vinculados", k.lotes, "lotes", "info", "Entradas rastreadas por origem", "positivo") }}
+  </div>
+
+  {% if request and request.query_params.get('importados') %}
+  <div class="bmq-pill-sucesso" style="border-radius:var(--raio-md); padding:10px 14px; margin-bottom:16px; font-size:13px; font-weight:700;">
+    Planilha processada com sucesso: {{ request.query_params.get('importados') }} fornecedor(es) importado(s).
+  </div>
+  {% endif %}
+
+  <!-- Card Principal: Lista de Fornecedores (s11.png) -->
+  <section class="bmq-card" style="overflow:hidden;">
+    <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Diretório de fornecedores</h2>
+        <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Distribuidores, fabricantes e representantes de perfumaria e cosméticos</p>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+        {% if usuario.perfil != Perfil.VENDEDOR %}
+          <button type="button" class="bmq-btn bmq-btn-secundario" @click="modalImportar = true">
+            {{ icone("upload", 16) }} <span>Importar</span>
+          </button>
+          <a href="/fornecedores/novo" class="bmq-btn bmq-btn-primario">
+            {{ icone("adicionar", 16) }} <span>Novo fornecedor</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <form style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; gap:12px;"
+          hx-get="/fornecedores" hx-target="#tabela" hx-trigger="input delay:300ms from:#q, change">
+      <div style="position:relative; flex:1; min-width:240px;">
+        <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--tinta-suave);">
+          {{ icone("buscar", 16) }}
+        </span>
+        <input id="q" name="q" value="{{ q }}" placeholder="Buscar por razão social, nome fantasia ou CNPJ…"
+               class="bmq-input" style="padding-left:34px;">
+      </div>
+      <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--tinta-suave); cursor:pointer;">
+        <input type="checkbox" name="inativos" value="true" {{ 'checked' if inativos }} style="accent-color:var(--rosa);">
+        <span>Mostrar inativos</span>
+      </label>
+    </form>
+
+    <div id="tabela">{% include "fornecedores/_tabela.html" %}</div>
+  </section>
+
+  <!-- Modal T05: Importar planilha - Fornecedores (s12.png + s09.png) -->
+  <div x-cloak x-show="modalImportar" class="bmq-modal-backdrop" @click.self="modalImportar = false"
+       x-data="{ nomeArquivo: '', estadoUpload: 'vazio' }">
+    <div class="bmq-modal" style="max-width:520px;">
+      <div class="bmq-modal-header">
+        <div>
+          <h2 class="bmq-modal-title">Importar planilha - Fornecedores</h2>
+          <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Cadastre múltiplos fornecedores via arquivo CSV ou Excel</p>
+        </div>
+        <button type="button" class="bmq-modal-close" @click="modalImportar = false" aria-label="Fechar">
+          {{ icone("fechar", 15) }}
+        </button>
+      </div>
+      <form method="post" action="/fornecedores/importar" enctype="multipart/form-data">
+        <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
+          <label for="input_planilha_forn" class="bmq-dropzone">
+            <span class="bmq-kpi-bubble d-dourado" style="width:48px; height:48px;">
+              {{ icone("planilha", 24) }}
+            </span>
+            <div style="font-weight:700; font-size:14px; color:var(--preto);">
+              Arraste e solte aqui ou <span style="color:var(--dourado); text-decoration:underline;">Abrir arquivos</span>
+            </div>
+            <div style="font-size:12px; color:var(--tinta-suave);">Formatos suportados: .CSV ou .XLSX</div>
+            <input id="input_planilha_forn" name="arquivo" type="file" accept=".csv,.xlsx" required style="display:none;"
+                   @change="if ($event.target.files.length) { nomeArquivo = $event.target.files[0].name; estadoUpload = 'enviando'; setTimeout(() => estadoUpload = 'concluido', 350); }">
+          </label>
+
+          <div class="bmq-filebar" :class="{ 'concluido': estadoUpload === 'concluido' }">
+            <template x-if="estadoUpload === 'enviando'">
+              <div class="bmq-filebar-progress" style="width: 65%;"></div>
+            </template>
+            <div class="bmq-filebar-content">
+              <span style="font-weight:600; color:var(--tinta);" x-text="nomeArquivo || 'Nenhum arquivo selecionado'"></span>
+              <template x-if="estadoUpload === 'vazio'">
+                <label for="input_planilha_forn" class="bmq-btn bmq-btn-secundario" style="height:28px; padding:0 12px; font-size:12px; cursor:pointer;">
+                  Procurar
+                </label>
+              </template>
+              <template x-if="estadoUpload === 'concluido'">
+                <span style="width:22px; height:22px; border-radius:999px; background:var(--sucesso-fg); color:#fff; display:inline-flex; align-items:center; justify-content:center;">
+                  {{ icone("confirmado", 14) }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; font-size:12.5px;">
+            <span style="color:var(--tinta-suave);">Precisa do modelo padrão?</span>
+            <a href="/fornecedores/importar/modelo" style="color:var(--dourado-escuro); font-weight:700; text-decoration:underline;">
+              Baixar planilha modelo (.csv)
+            </a>
+          </div>
+        </div>
+        <div class="bmq-modal-footer">
+          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;" :disabled="!nomeArquivo">
+            Importar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

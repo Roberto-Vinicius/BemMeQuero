@@ -1,0 +1,72 @@
+{% from "_macros.html" import icone, pill, estado_vazio %}
+<div class="bmq-table-wrap">
+  <table class="bmq-table">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Fornecedor</th>
+        <th>Tipo</th>
+        <th>CPF / CNPJ</th>
+        <th>Contato</th>
+        <th>Prazo médio</th>
+        <th>Status</th>
+        <th style="text-align:right;">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for f in fornecedores %}
+      <tr style="{{ 'opacity:0.58;' if not f.ativo }}">
+        <td style="font-family:monospace; font-size:12px; font-weight:700; color:var(--tinta-suave);">
+          {{ f.codigo or ('FOR-%03d'|format(f.id)) }}
+        </td>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="bmq-tile">{{ icone("fornecedores", 17) }}</span>
+            <div>
+              <a href="{{ '/fornecedores/' ~ f.id ~ '/editar' if usuario.perfil != Perfil.VENDEDOR else '#' }}"
+                 style="font-weight:700; color:var(--preto);">
+                {{ f.nome }}
+              </a>
+              {% if f.cidade %}
+                <div style="font-size:11.5px; color:var(--tinta-suave);">{{ f.cidade }}{{ '/' ~ f.uf if f.uf else '' }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td>
+          {{ pill(f.tipo_fornecedor or 'Distribuidor', 'info') }}
+        </td>
+        <td style="font-family:monospace; font-size:12.5px;">{{ f.cpf_cnpj|doc or '—' }}</td>
+        <td>
+          <div style="font-weight:600;">{{ f.contato or f.telefone or '—' }}</div>
+          {% if f.email %}<div style="font-size:11.5px; color:var(--tinta-suave);">{{ f.email }}</div>{% endif %}
+        </td>
+        <td style="color:var(--tinta-suave);">
+          {{ f.prazo_entrega or '—' }}
+        </td>
+        <td>
+          {{ pill('Ativo' if f.ativo else 'Inativo', 'sucesso' if f.ativo else 'neutro') }}
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          {% if usuario.perfil != Perfil.VENDEDOR %}
+            <a href="/fornecedores/{{ f.id }}/editar" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px; color:var(--rosa);">
+              Editar
+            </a>
+            <form method="post" action="/fornecedores/{{ f.id }}/ativo" style="display:inline;">
+              <button type="submit" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;">
+                {{ 'Inativar' if f.ativo else 'Reativar' }}
+              </button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="8">
+          {{ estado_vazio("Nenhum fornecedor encontrado.", "Cadastre seus distribuidores e representantes para vincular lotes de compra.", "Novo fornecedor", "/fornecedores/novo" if usuario.perfil != Perfil.VENDEDOR else None) }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

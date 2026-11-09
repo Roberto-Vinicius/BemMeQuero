@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, campo, alerta, componente_arquivo %}
+{% block titulo %}{{ 'Editar fornecedor' if fornecedor else 'Novo fornecedor' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar fornecedor' if fornecedor else 'Cadastro de fornecedor' }}{% endblock %}
+{% block conteudo %}
+{% set is_dict = v is mapping %}
+{% set cod_val = (v.get('codigo') if is_dict else v.codigo) or proximo_codigo|default('FOR-001') %}
+{% set tipo_val = (v.get('tipo_fornecedor') if is_dict else v.tipo_fornecedor) or '' %}
+{% set ativo_val = v.get('ativo', True) if is_dict else v.ativo %}
+{% set obs_val = (v.get('observacoes') if is_dict else v.observacoes) or '' %}
+
+{{ alerta(erro_geral) }}
+
+<form method="post" x-data="{ contatoSecAberto: false }">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <div>
+      <h2 style="font-size:20px; margin:0;">{{ 'Editar fornecedor' if fornecedor else 'Adicionar novo fornecedor' }}</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Dados empresariais, contato comercial, condições de entrega e documentos</p>
+    </div>
+    <a href="/fornecedores" class="bmq-btn bmq-btn-fantasma">← Voltar para fornecedores</a>
+  </div>
+
+  <!-- Layout de 2 colunas com 4 cards (T09 - s14.png) -->
+  <div class="bmq-grid-2col">
+
+    <!-- COLUNA ESQUERDA: Informações Básicas + Informações Adicionais -->
+    <div style="display:flex; flex-direction:column; gap:22px; min-width:0;">
+
+      <!-- Card 1: Informações Básicas -->
+      <section class="bmq-card" style="padding:22px;">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+          <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("fornecedores", 16) }}</span>
+          <h3 style="font-size:16px; margin:0;">Informações básicas</h3>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="bmq-grid-form-2">
+            <div>
+              <label class="bmq-label" for="codigo">ID do fornecedor</label>
+              <input id="codigo" name="codigo" value="{{ cod_val }}" readonly class="bmq-input" style="background:rgba(252,250,237,0.8); font-family:monospace; font-weight:700;">
+            </div>
+            <div>
+              <label class="bmq-label" for="tipo_fornecedor">Tipo de fornecedor</label>
+              <!-- Opções do Figma (s10.png) -->
+              <select id="tipo_fornecedor" name="tipo_fornecedor" class="bmq-select">
+                <option value="">Selecione um tipo…</option>
+                {% for tp in ["Fabricante", "Distribuidor", "Atacadista", "Varejista", "Serviços"] %}
+                  <option value="{{ tp }}" {{ 'selected' if tipo_val == tp }}>{{ tp }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          {{ campo("nome", "Nome da empresa / Razão social *", v, erros, extra='required placeholder="Ex.: Boticário Franchising Ltda"') }}
+
+          <div class="bmq-grid-form-2">
+            {{ campo("cpf_cnpj", "CNPJ ou CPF", v, erros, extra='inputmode="numeric" placeholder="00.000.000/0001-00"') }}
+            {{ campo("fornecedor_desde", "Fornecedor desde", v, erros, "date") }}
+          </div>
+
+          <div style="padding-top:4px;">
+            <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:13px;">
+              <input type="checkbox" name="ativo" value="on" class="bmq-toggle" {{ 'checked' if ativo_val }}>
+              <span>Fornecedor Ativo</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 2: Informações Adicionais -->
+      <section class="bmq-card" style="padding:22px;">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+          <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("preco", 16) }}</span>
+          <h3 style="font-size:16px; margin:0;">Informações adicionais</h3>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="bmq-grid-form-2">
+            {{ campo("condicoes_pagamento", "Condições de pagamento", v, erros, extra='placeholder="Ex.: 28/56/84 dias no boleto"') }}
+            {{ campo("prazo_entrega", "Prazo médio de entrega", v, erros, extra='placeholder="Ex.: 7 dias úteis"') }}
+          </div>
+
+          <div>
+            <label class="bmq-label" for="observacoes">Observações e acordos comerciais</label>
+            <textarea id="observacoes" name="observacoes" rows="3" class="bmq-textarea"
+                      placeholder="Política de bonificação, brindes de vitrine, representante regional…">{{ obs_val }}</textarea>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- COLUNA DIREITA: Informações de Contato + Documentos -->
+    <div style="display:flex; flex-direction:column; gap:22px; min-width:0;">
+
+      <!-- Card 3: Informações de Contato -->
+      <section class="bmq-card" style="padding:22px;">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+          <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("email", 16) }}</span>
+          <h3 style="font-size:16px; margin:0;">Informações de contato</h3>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          {{ campo("endereco", "Endereço comercial completo", v, erros, extra='placeholder="Av. Hermes da Fonseca, 1200 - Tirol"') }}
+
+          <div class="bmq-grid-form-2">
+            {{ campo("cidade", "Cidade", v, erros, extra='placeholder="Natal"') }}
+            {{ campo("uf", "UF", v, erros, extra='maxlength="2" placeholder="RN"') }}
+          </div>
+
+          <div class="bmq-grid-form-2">
+            {{ campo("telefone", "Telefone / WhatsApp", v, erros, extra='placeholder="(84) 99999-0000"') }}
+            {{ campo("email", "E-mail comercial", v, erros, "email", 'placeholder="pedidos@fornecedor.com.br"') }}
+          </div>
+
+          {{ campo("contato", "Pessoa de contato (Representante)", v, erros, extra='placeholder="Nome do(a) consultor(a) ou telefone"') }}
+        </div>
+      </section>
+
+      <!-- Card 4: Documentos com o componente de arquivo de 4 estados (s09.png + s14.png) -->
+      <section class="bmq-card" style="padding:22px;">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+          <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("planilha", 16) }}</span>
+          <h3 style="font-size:16px; margin:0;">Documentos</h3>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          {{ componente_arquivo("doc_contrato", "Contrato de fornecimento", ".pdf,.doc,.docx") }}
+          {{ componente_arquivo("doc_certificado", "Certificações de qualidade (ANVISA / AFE)", ".pdf,.jpg,.png") }}
+          {{ componente_arquivo("doc_outros", "Catálogo ou tabela de preços", ".pdf,.xlsx,.csv") }}
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Rodapé de Ações (s14.png) -->
+  <div class="bmq-card" style="margin-top:22px; padding:16px 22px; display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+    <a href="/fornecedores" class="bmq-btn bmq-btn-secundario">Cancelar</a>
+    <button type="submit" class="bmq-btn bmq-btn-primario">
+      {{ icone("confirmado", 16) }} <span>Salvar fornecedor</span>
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, campo, select, alerta %}
+{% block titulo %}{{ 'Editar produto' if produto else 'Adicionar novo produto' }}{% endblock %}
+{% block titulo_pagina %}{{ 'Editar produto' if produto else 'Adicionar novo produto' }}{% endblock %}
+{% block conteudo %}
+{% set is_dict = v is mapping %}
+{% set val_custo = (v.get('preco_custo') if is_dict else v.preco_custo) or '' %}
+{% set val_venda = (v.get('preco_venda') if is_dict else v.preco_venda) or '' %}
+{% set val_sku = (v.get('sku') if is_dict else v.sku) or proximo_sku|default('BMQ-0001') %}
+{% set val_barras = (v.get('codigo_barras') if is_dict else v.codigo_barras) or '' %}
+{% set val_ativo = v.get('ativo', True) if is_dict else v.ativo %}
+
+{{ alerta(erro_geral) }}
+
+<form method="post" enctype="multipart/form-data" class="bmq-card"
+      style="padding:24px; max-width:1040px;"
+      x-data="{
+        sku: '{{ val_sku }}',
+        barras: '{{ val_barras }}',
+        custo: '{{ val_custo }}',
+        venda: '{{ val_venda }}',
+        previewUrl: '{{ ('/static/' ~ produto.foto_path) if produto and produto.foto_path else '' }}',
+        detalhesAbertos: {{ 'true' if not produto else 'false' }},
+        gerarSku() {
+          const rnd = Math.floor(1000 + Math.random() * 9000);
+          this.sku = 'BMQ-' + rnd;
+        },
+        gerarBarras() {
+          let base = '789' + String(Math.floor(100000000 + Math.random() * 899999999));
+          let soma = 0;
+          for (let i = 0; i < 12; i++) soma += parseInt(base[i]) * (i % 2 === 0 ? 1 : 3);
+          let dv = (10 - (soma % 10)) % 10;
+          this.barras = base + String(dv);
+        },
+        get margem() {
+          const c = parseFloat(String(this.custo).replace(',', '.')) || 0;
+          const vd = parseFloat(String(this.venda).replace(',', '.')) || 0;
+          if (c <= 0 || vd <= 0) return null;
+          return (((vd - c) / c) * 100).toFixed(1);
+        }
+      }">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:16px; margin-bottom:20px; border-bottom:1px solid var(--linha);">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="bmq-kpi-bubble d-dourado" style="width:36px; height:36px;">
+        {{ icone("perfume", 18) }}
+      </span>
+      <div>
+        <h2 style="font-size:19px; margin:0;">{{ 'Editar produto' if produto else 'Adicionar novo produto' }}</h2>
+        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Preencha os dados cadastrais, precificação e características de perfumaria</p>
+      </div>
+    </div>
+    <a href="/produtos" class="bmq-btn bmq-btn-fantasma">← Voltar para produtos</a>
+  </div>
+
+  <!-- Layout em 2 colunas estilo Estocaê (T06 - s06.png) -->
+  <div class="bmq-grid-2col">
+
+    <!-- COLUNA ESQUERDA: Imagem, Nome, Código SKU, Descrição -->
+    <div style="display:flex; flex-direction:column; gap:14px; min-width:0;">
+      <div>
+        <label class="bmq-label" for="foto">Imagem do produto</label>
+        <label for="foto" class="bmq-dropzone" style="padding:18px;">
+          <template x-if="previewUrl">
+            <img :src="previewUrl" alt="Prévia do produto" style="width:84px; height:84px; object-fit:cover; border-radius:8px; border:1px solid var(--linha);">
+          </template>
+          <template x-if="!previewUrl">
+            <span class="bmq-kpi-bubble d-dourado" style="width:44px; height:44px;">
+              {{ icone("imagem-mais", 22) }}
+            </span>
+          </template>
+          <div style="font-size:13px; font-weight:700;">
+            <span style="color:var(--dourado-escuro); text-decoration:underline;">Enviar uma imagem</span> ou arraste e solte
+          </div>
+          <div style="font-size:11.5px; color:var(--tinta-suave);">PNG, JPG ou WEBP até 2 MB</div>
+          <input id="foto" name="foto" type="file" accept=".jpg,.jpeg,.png,.webp" style="display:none;"
+                 @change="if ($event.target.files[0]) previewUrl = URL.createObjectURL($event.target.files[0])">
+        </label>
+      </div>
+
+      {{ campo("nome", "Nome do produto *", v, erros, extra='placeholder="Ex.: Floratta Red Eau de Toilette 75 ml" required') }}
+
+      <div>
+        <label class="bmq-label" for="sku">Código do produto (SKU) *</label>
+        <div class="bmq-input-group">
+          <input id="sku" name="sku" x-model="sku" required placeholder="BMQ-0001"
+                 class="bmq-input {{ 'erro' if erros.sku }}">
+          <button type="button" class="bmq-input-addon-btn" @click="gerarSku()" title="Gerar próximo código SKU">
+            {{ icone("atualizar", 16) }}
+          </button>
+        </div>
+        {% if erros.sku %}<p class="bmq-erro-msg">{{ erros.sku }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label class="bmq-label" for="descricao">Descrição e notas olfativas</label>
+        <textarea id="descricao" name="descricao" rows="3" class="bmq-textarea"
+                  placeholder="Pirâmide olfativa, modo de uso ou observações de vitrine…">{{ (v.get('descricao') if is_dict else v.descricao) or '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- COLUNA DIREITA: Categoria, Marca, Fornecedor, Preços, Estoque mínimo, Barras, Localização, Status -->
+    <div style="display:flex; flex-direction:column; gap:14px; min-width:0;">
+      <div class="bmq-grid-form-2">
+        {{ select("categoria_id", "Categoria *", categorias, v, erros) }}
+        {{ select("marca_id", "Marca *", marcas, v, erros) }}
+      </div>
+
+      <div>
+        <label class="bmq-label" for="fornecedor_id">Fornecedor principal</label>
+        {% set forn_sel = (v.get('fornecedor_id') if is_dict else v.fornecedor_id) %}
+        <select id="fornecedor_id" name="fornecedor_id" class="bmq-select">
+          <option value="">Selecione um fornecedor (opcional)…</option>
+          {% for f in fornecedores|default([]) %}
+            <option value="{{ f.id }}" {{ 'selected' if forn_sel|string == f.id|string }}>{{ f.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="bmq-grid-form-2">
+        <div>
+          <label class="bmq-label" for="preco_custo">Preço de custo (R$) *</label>
+          <input id="preco_custo" name="preco_custo" x-model="custo" inputmode="decimal" placeholder="59,90" required
+                 class="bmq-input {{ 'erro' if erros.preco_custo }}">
+          {% if erros.preco_custo %}<p class="bmq-erro-msg">{{ erros.preco_custo }}</p>{% endif %}
+        </div>
+        <div>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <label class="bmq-label" for="preco_venda">Preço de venda (R$) *</label>
+            <template x-if="margem !== null">
+              <span class="bmq-pill bmq-pill-sucesso" style="font-size:10.5px; padding:1px 7px;" x-text="'Margem: +' + margem + '%'"></span>
+            </template>
+          </div>
+          <input id="preco_venda" name="preco_venda" x-model="venda" inputmode="decimal" placeholder="129,90" required
+                 class="bmq-input {{ 'erro' if erros.preco_venda }}">
+          {% if erros.preco_venda %}<p class="bmq-erro-msg">{{ erros.preco_venda }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="bmq-grid-form-2">
+        {{ campo("estoque_minimo", "Quantidade mínima", v, erros, "number", 'min="0"') }}
+
+        <div>
+          <label class="bmq-label" for="codigo_barras">Código de barras (EAN-13)</label>
+          <div class="bmq-input-group">
+            <input id="codigo_barras" name="codigo_barras" x-model="barras" placeholder="7891000100103"
+                   class="bmq-input {{ 'erro' if erros.codigo_barras }}">
+            <button type="button" class="bmq-input-addon-btn" @click="gerarBarras()" title="Gerar código de barras interno">
+              {{ icone("codigo-barras", 16) }}
+            </button>
+          </div>
+          {% if erros.codigo_barras %}<p class="bmq-erro-msg">{{ erros.codigo_barras }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="bmq-grid-form-2" style="align-items:end;">
+        {{ campo("localizacao", "Localização no estoque", v, erros, extra='placeholder="Ex.: Vitrine 2, gaveta B"') }}
+        <div style="padding-bottom:6px;">
+          <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:13px;">
+            <input type="checkbox" name="ativo" class="bmq-toggle" {{ 'checked' if val_ativo }}>
+            <span>Produto Ativo</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campos específicos de Perfumaria e Cosméticos (T06) -->
+  <div style="margin-top:20px; padding-top:18px; border-top:1px solid var(--linha);">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+      <span style="color:var(--dourado);">{{ icone("flor", 18) }}</span>
+      <strong style="font-size:14px;">Atributos de perfumaria e cosméticos</strong>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+      {{ campo("volume_valor", "Volume / peso", v, erros, extra='inputmode="decimal" placeholder="100"') }}
+
+      <div>
+        <label class="bmq-label" for="volume_unidade">Unidade</label>
+        {% set u_sel = (v.get('volume_unidade') if is_dict else v.volume_unidade) or '' %}
+        <select id="volume_unidade" name="volume_unidade" class="bmq-select">
+          {% for u in ["", "ml", "g", "un"] %}
+            <option value="{{ u }}" {{ 'selected' if u_sel == u }}>{{ u or '—' }}</option>
+          {% endfor %}
+        </select>
+        {% if erros.volume_unidade %}<p class="bmq-erro-msg">{{ erros.volume_unidade }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label class="bmq-label" for="tipo_perfumaria">Tipo / Concentração</label>
+        {% set t_sel = (v.get('tipo_perfumaria') if is_dict else v.tipo_perfumaria) or '' %}
+        <select id="tipo_perfumaria" name="tipo_perfumaria" class="bmq-select">
+          <option value="">Selecione…</option>
+          {% for tp in ["Eau de Parfum", "Eau de Toilette", "Colônia", "Body splash", "Hidratante", "Batom", "Base", "Outro"] %}
+            <option value="{{ tp }}" {{ 'selected' if t_sel == tp }}>{{ tp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="bmq-label" for="familia_olfativa">Família olfativa</label>
+        {% set fo_sel = (v.get('familia_olfativa') if is_dict else v.familia_olfativa) or '' %}
+        <select id="familia_olfativa" name="familia_olfativa" class="bmq-select">
+          <option value="">Selecione…</option>
+          {% for fo in ["Floral", "Amadeirado", "Cítrico", "Oriental", "Fresco", "Gourmand"] %}
+            <option value="{{ fo }}" {{ 'selected' if fo_sel == fo }}>{{ fo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="bmq-label" for="publico">Público</label>
+        {% set pub_sel = (v.get('publico') if is_dict else v.publico) or '' %}
+        <select id="publico" name="publico" class="bmq-select">
+          <option value="">Selecione…</option>
+          {% for pb in ["Feminino", "Masculino", "Unissex"] %}
+            <option value="{{ pb }}" {{ 'selected' if pub_sel == pb }}>{{ pb }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seção recolhível: Detalhes adicionais + Estoque inicial na criação (s06.png + s07.png) -->
+  <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--linha);">
+    <button type="button" @click="detalhesAbertos = !detalhesAbertos"
+            style="display:flex; align-items:center; justify-content:space-between; width:100%; background:transparent; border:0; padding:4px 0; cursor:pointer; font-family:'Nunito',sans-serif; font-size:14px; font-weight:700; color:var(--preto);">
+      <span style="display:inline-flex; align-items:center; gap:8px;">
+        <span style="color:var(--dourado);">{{ icone("lotes", 18) }}</span>
+        <span>Detalhes adicionais{% if not produto %} e Estoque inicial (opcional){% endif %}</span>
+      </span>
+      <span :style="detalhesAbertos ? 'transform:rotate(180deg)' : ''">{{ icone("chevron-baixo", 16) }}</span>
+    </button>
+
+    <div x-show="detalhesAbertos" style="margin-top:12px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+      {{ campo("peso_kg", "Peso bruto (kg)", v, erros, extra='inputmode="decimal" placeholder="0,250"') }}
+      {{ campo("dimensoes_cm", "Dimensões (C x L x A cm)", v, erros, extra='placeholder="12 x 6 x 4"') }}
+
+      {% if not produto %}
+      <div>
+        <label class="bmq-label" for="estoque_inicial">Estoque inicial (un.)</label>
+        <input id="estoque_inicial" name="estoque_inicial" type="number" min="0" value="0" class="bmq-input">
+      </div>
+      <div>
+        <label class="bmq-label" for="lote_inicial">Lote inicial</label>
+        <input id="lote_inicial" name="lote_inicial" placeholder="Ex.: LOTE-2026A" class="bmq-input">
+      </div>
+      <div>
+        <label class="bmq-label" for="validade_inicial">Data de validade do lote</label>
+        <input id="validade_inicial" name="validade_inicial" type="date" class="bmq-input">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Rodapé do formulário -->
+  <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--linha); display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+    <a href="/produtos" class="bmq-btn bmq-btn-secundario">Cancelar</a>
+    <button type="submit" class="bmq-btn bmq-btn-primario">
+      {{ icone("confirmado", 16) }} <span>Salvar</span>
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% from "_macros.html" import icone, pill, tile_produto, estado_vazio %}
+{% set mapa_saldos = saldos|default({}) %}
+<div class="bmq-table-wrap">
+  <table class="bmq-table">
+    <thead>
+      <tr>
+        <th>Produto</th>
+        <th>Marca</th>
+        <th>Categoria</th>
+        <th>Código (SKU)</th>
+        <th>Volume</th>
+        <th style="text-align:right;">Venda</th>
+        <th style="text-align:right;">Estoque</th>
+        <th style="text-align:right;">Mín.</th>
+        <th>Status</th>
+        <th style="text-align:right;">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in produtos %}
+      {% set saldo_atual = mapa_saldos.get(p.id, 0) %}
+      <tr style="{{ 'opacity:0.58;' if not p.ativo }}">
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            {{ tile_produto(p) }}
+            <div>
+              <a href="{{ '/produtos/' ~ p.id ~ '/editar' if usuario.perfil != Perfil.VENDEDOR else '/estoque/produto/' ~ p.id }}"
+                 style="font-weight:700; color:var(--preto);">
+                {{ p.nome }}
+              </a>
+              {% if not p.ativo %}
+                <span class="bmq-pill bmq-pill-neutro" style="margin-left:4px; font-size:10px;">inativo</span>
+              {% endif %}
+              {% if p.tipo_perfumaria or p.familia_olfativa %}
+                <div style="font-size:11px; color:var(--tinta-suave);">
+                  {{ p.tipo_perfumaria or '' }}{{ ' · ' ~ p.familia_olfativa if p.familia_olfativa else '' }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td style="font-weight:600;">{{ p.marca.nome }}</td>
+        <td>{{ p.categoria.nome }}</td>
+        <td style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
+        <td style="color:var(--tinta-suave);">
+          {% if p.volume_valor %}{{ '%g'|format(p.volume_valor) }} {{ p.volume_unidade or '' }}{% else %}—{% endif %}
+        </td>
+        <td style="text-align:right; font-weight:700;">{{ p.preco_venda|brl }}</td>
+        <td style="text-align:right; font-weight:800; color:{{ 'var(--erro-fg)' if saldo_atual < p.estoque_minimo else 'var(--preto)' }};">
+          <a href="/estoque/produto/{{ p.id }}">{{ saldo_atual }} un.</a>
+        </td>
+        <td style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
+        <td>
+          {{ pill('Ativo' if p.ativo else 'Inativo', 'sucesso' if p.ativo else 'neutro') }}
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <a href="/estoque/produto/{{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;" title="Ver lotes">
+            Lotes
+          </a>
+          {% if usuario.perfil != Perfil.VENDEDOR %}
+            <a href="/produtos/{{ p.id }}/editar" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px; color:var(--rosa);">
+              Editar
+            </a>
+            <form method="post" action="/produtos/{{ p.id }}/ativo" style="display:inline;">
+              <button type="submit" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;">
+                {{ 'Inativar' if p.ativo else 'Reativar' }}
+              </button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="10">
+          {{ estado_vazio("Nenhum produto encontrado.", "Ajuste os filtros de busca ou cadastre um novo item no catálogo.", "Adicionar produto", "/produtos/novo" if usuario.perfil != Perfil.VENDEDOR else None) }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

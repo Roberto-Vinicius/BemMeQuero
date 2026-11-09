@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, kpi_card, pill_status_estoque, tile_produto, estado_vazio %}
+{% block titulo %}Estoque{% endblock %}
+{% block titulo_pagina %}Controle de estoque{% endblock %}
+{% block conteudo %}
+{% set ns = namespace(unidades=0, abaixo=0, zerados=0, valor=0) %}
+{% for p, saldo in linhas %}
+  {% set ns.unidades = ns.unidades + saldo %}
+  {% set ns.valor = ns.valor + (saldo * (p.preco_custo or 0)) %}
+  {% if saldo <= 0 %}
+    {% set ns.zerados = ns.zerados + 1 %}
+  {% endif %}
+  {% if saldo < p.estoque_minimo %}
+    {% set ns.abaixo = ns.abaixo + 1 %}
+  {% endif %}
+{% endfor %}
+
+<!-- 4 KPIs de Estoque (T07 - s08.png) -->
+<div class="bmq-kpi-grid" style="margin-bottom:24px;">
+  {{ kpi_card("Total em estoque", ns.unidades ~ " un.", "lotes", "rosa", (linhas|length) ~ " produtos monitorados", "neutro") }}
+  {{ kpi_card("Estoque baixo", ns.abaixo, "estoque-baixo", "erro", "Abaixo do estoque mínimo", "negativo" if ns.abaixo > 0 else "positivo") }}
+  {{ kpi_card("Fora de estoque", ns.zerados, "alertas", "dourado", "Produtos com saldo zero", "negativo" if ns.zerados > 0 else "positivo") }}
+  {% if usuario.perfil == Perfil.ADMIN %}
+    {{ kpi_card("Valor em estoque", ns.valor|brl, "preco", "sucesso", "Calculado a preço de custo", "positivo") }}
+  {% else %}
+    {{ kpi_card("Produtos ativos", linhas|length, "perfume", "sucesso", "Itens disponíveis no catálogo", "positivo") }}
+  {% endif %}
+</div>
+
+<!-- Card Principal de Posição de Estoque (s08.png) -->
+<section class="bmq-card" style="overflow:hidden;">
+  <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+    <div>
+      <h2 style="font-size:18px; margin:0;">Posição de estoque e lotes</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Controle FEFO (primeiro que vence, primeiro que sai) e níveis de reposição</p>
+    </div>
+
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+      <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
+        {{ icone("exportar", 16) }} <span>Exportar</span>
+      </a>
+      {% if usuario.perfil != Perfil.VENDEDOR %}
+        <a href="/estoque/movimentar/entrada" class="bmq-btn bmq-btn-primario">
+          {{ icone("entrada", 16) }} <span>+ Entrada</span>
+        </a>
+      {% endif %}
+      <a href="/estoque/movimentar/venda" class="bmq-btn bmq-btn-secundario">
+        {{ icone("saida", 16) }} <span>Venda</span>
+      </a>
+      <a href="/estoque/movimentar/devolucao" class="bmq-btn bmq-btn-fantasma">Devolução</a>
+      {% if usuario.perfil != Perfil.VENDEDOR %}
+        <a href="/estoque/movimentar/ajuste" class="bmq-btn bmq-btn-fantasma">Ajuste</a>
+        <a href="/estoque/movimentar/perda" class="bmq-btn bmq-btn-fantasma">Perda</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Busca -->
+  <form style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; gap:12px;">
+    <div style="position:relative; flex:1;">
+      <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--tinta-suave);">
+        {{ icone("buscar", 16) }}
+      </span>
+      <input name="q" value="{{ q }}" placeholder="Buscar por nome, marca, SKU ou código de barras…"
+             class="bmq-input" style="padding-left:34px;">
+    </div>
+    <button type="submit" class="bmq-btn bmq-btn-secundario">Filtrar</button>
+  </form>
+
+  <div class="bmq-table-wrap">
+    <table class="bmq-table">
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Marca</th>
+          <th>Código (SKU)</th>
+          <th style="text-align:right;">Valor compra</th>
+          <th style="text-align:right;">Valor unit.</th>
+          <th>Estoque total</th>
+          <th style="text-align:right;">Mínimo</th>
+          <th>Status</th>
+          <th style="text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p, saldo in linhas %}
+        {% set pct = ((saldo / (2 * p.estoque_minimo)) * 100)|round|int if p.estoque_minimo > 0 else 100 %}
+        {% set pct_clamp = 100 if pct > 100 else (6 if pct < 6 and saldo > 0 else pct) %}
+        <tr>
+          <td>
+            <a href="/estoque/produto/{{ p.id }}" style="display:flex; align-items:center; gap:10px;">
+              {{ tile_produto(p) }}
+              <div>
+                <div style="font-weight:700; color:var(--preto);">{{ p.nome }}</div>
+                <div style="font-size:11.5px; color:var(--tinta-suave);">{{ p.categoria.nome if p.categoria else '' }}{% if p.localizacao %} · {{ p.localizacao }}{% endif %}</div>
+              </div>
+            </a>
+          </td>
+          <td style="font-weight:600;">{{ p.marca.nome }}</td>
+          <td style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
+          <td style="text-align:right; color:var(--tinta-suave);">{{ p.preco_custo|brl }}</td>
+          <td style="text-align:right; font-weight:700;">{{ p.preco_venda|brl }}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="bmq-progress" style="width:76px;">
+                <div class="bmq-progress-bar" style="width:{{ pct_clamp }}%; background:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--sucesso-fg)' }};"></div>
+              </div>
+              <strong style="font-weight:800; color:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--preto)' }};">{{ saldo }}</strong>
+              <span style="font-size:11.5px; color:var(--tinta-suave);">un.</span>
+            </div>
+          </td>
+          <td style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
+          <td>
+            {{ pill_status_estoque(saldo, p.estoque_minimo) }}
+            {% if saldo < p.estoque_minimo %}
+              <span class="bmq-pill bmq-pill-erro" style="margin-left:4px; font-size:10.5px;">Abaixo do mínimo</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="/estoque/produto/{{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px; color:var(--rosa);">
+              Ver lotes
+            </a>
+            {% if usuario.perfil != Perfil.VENDEDOR %}
+              <a href="/estoque/movimentar/entrada?produto_id={{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;">
+                + Entrada
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="9">
+            {{ estado_vazio("Nenhum produto encontrado.", "Verifique os termos de busca ou cadastre um novo produto.") }}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

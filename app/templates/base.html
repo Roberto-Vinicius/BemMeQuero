@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Visão geral{% endblock %} · Bem Me Quero · Estoque</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/logo-flor.svg?v=5">
+  <link rel="stylesheet" href="/static/css/bemmequero.css?v=5">
+  <script src="/static/js/htmx.min.js" defer></script>
+  <script src="/static/js/alpine.min.js" defer></script>
+  <script src="/static/js/chart.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
+</head>
+<body x-data="{ gavetaAberta: false, menuUsuario: false, menuAlertas: false, modalAberto: false, toasts: [] }"
+      @bmq-toast.window="toasts.push({ id: Date.now(), ...$event.detail }); setTimeout(() => toasts.shift(), 4000)"
+      @keydown.escape.window="gavetaAberta = false; menuUsuario = false; menuAlertas = false; modalAberto = false">
+
+{% include "_icons.html" %}
+{% from "_macros.html" import icone %}
+
+{% if usuario %}
+{% set path = request.url.path if request else '/' %}
+{% set rotulo_perfil = {'admin': 'Administrador', 'estoquista': 'Estoquista', 'vendedor': 'Vendedor'}.get(usuario.perfil.value, usuario.perfil.value) %}
+<div class="bmq-shell">
+  <!-- Backdrop Mobile -->
+  <div x-cloak x-show="gavetaAberta" @click="gavetaAberta = false"
+       style="position:fixed; inset:0; background:rgba(27,23,23,0.4); z-index:35;"></div>
+
+  <!-- Sidebar 224px -->
+  <aside class="bmq-sidebar" :class="{ 'aberta': gavetaAberta }" aria-label="Menu lateral">
+    <a href="/" class="bmq-sidebar-brand">
+      <img src="/static/img/logo-flor.svg" alt="Flor Bem Me Quero">
+      <div class="bmq-brand-text">
+        <div class="bmq-brand-title">Bem Me Quero</div>
+        <div class="bmq-brand-sub">Estoque</div>
+      </div>
+    </a>
+
+    <nav class="bmq-nav">
+      <div>
+        <div class="bmq-nav-group-label">Menu principal</div>
+        <div class="bmq-nav-list">
+          <a href="/" class="bmq-nav-item {{ 'ativo' if path == '/' }}">
+            {{ icone("painel") }} <span>Dashboard</span>
+          </a>
+          <a href="/produtos" class="bmq-nav-item {{ 'ativo' if path.startswith('/produtos') }}">
+            {{ icone("perfume") }} <span>Produtos</span>
+          </a>
+          <a href="/estoque" class="bmq-nav-item {{ 'ativo' if path == '/estoque' or path.startswith('/estoque/produto') }}">
+            {{ icone("lotes") }} <span>Estoque</span>
+          </a>
+          {% if usuario.perfil != Perfil.VENDEDOR %}
+          <a href="/fornecedores" class="bmq-nav-item {{ 'ativo' if path.startswith('/fornecedores') }}">
+            {{ icone("fornecedores") }} <span>Fornecedores</span>
+          </a>
+          {% endif %}
+          <a href="/estoque/movimentacoes" class="bmq-nav-item {{ 'ativo' if path.startswith('/estoque/moviment') }}">
+            {{ icone("setas-trocadas") }} <span>Movimentações</span>
+          </a>
+          {% if usuario.perfil != Perfil.VENDEDOR %}
+          <a href="/relatorios" class="bmq-nav-item {{ 'ativo' if path.startswith('/relatorios') }}">
+            {{ icone("relatorios") }} <span>Relatórios</span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if usuario.perfil == Perfil.ADMIN %}
+      <div>
+        <div class="bmq-nav-group-label">Configurações</div>
+        <div class="bmq-nav-list">
+          <a href="/sistema" class="bmq-nav-item {{ 'ativo' if path.startswith('/sistema') }}">
+            {{ icone("configuracoes") }} <span>Sistema</span>
+          </a>
+          <a href="/usuarios" class="bmq-nav-item {{ 'ativo' if path.startswith('/usuarios') }}">
+            {{ icone("usuarios") }} <span>Usuários</span>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </nav>
+
+    <!-- Rodapé do usuário -->
+    <div class="bmq-sidebar-footer">
+      <button type="button" class="bmq-user-btn" @click="menuUsuario = !menuUsuario" aria-expanded="false">
+        <span class="bmq-avatar">
+          {% if usuario.avatar_path %}
+            <img src="/static/{{ usuario.avatar_path }}" alt="{{ usuario.nome }}">
+          {% else %}
+            {{ usuario.iniciais }}
+          {% endif %}
+        </span>
+        <div class="bmq-user-info" style="min-width:0; flex:1;">
+          <div style="font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo }}</div>
+          <div style="font-size:11.5px; color:var(--tinta-suave);">{{ rotulo_perfil }}</div>
+        </div>
+        {{ icone("chevron-baixo", 16) }}
+      </button>
+
+      <div x-cloak x-show="menuUsuario" @click.outside="menuUsuario = false"
+           class="bmq-card" style="position:absolute; bottom:66px; left:12px; right:12px; padding:6px; z-index:50;">
+        {% if usuario.perfil == Perfil.ADMIN %}
+        <a href="/sistema#perfil" class="bmq-nav-item" style="height:34px; font-size:13px;">
+          {{ icone("usuarios", 16) }} <span>Meu perfil</span>
+        </a>
+        {% endif %}
+        <form method="post" action="/logout" style="margin:0;">
+          <button type="submit" class="bmq-nav-item" style="width:100%; height:34px; font-size:13px; border:0; background:transparent; cursor:pointer; color:var(--erro-fg);">
+            {{ icone("sair", 16) }} <span>Sair</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Área Principal -->
+  <div class="bmq-main">
+    <!-- Topbar 56px -->
+    <header class="bmq-topbar">
+      <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+        <button type="button" @click="gavetaAberta = !gavetaAberta" aria-label="Abrir menu"
+                class="bmq-bell-btn bmq-mobile-menu-btn" id="bmq-mobile-menu-btn">
+          {{ icone("menu", 18) }}
+        </button>
+        <h1 class="bmq-topbar-title">{% block titulo_pagina %}{{ self.titulo() }}{% endblock %}</h1>
+      </div>
+
+      <div class="bmq-topbar-actions">
+        {% set placeholder_busca = "Pesquisar em produtos…" if path.startswith('/produtos') else ("Pesquisar em fornecedores…" if path.startswith('/fornecedores') else ("Pesquisar no estoque…" if path.startswith('/estoque') else "Pesquisar por nome, SKU ou código de barras…")) %}
+        {% set acao_busca = "/produtos" if path.startswith('/produtos') else ("/fornecedores" if path.startswith('/fornecedores') else "/estoque") %}
+        <form action="{{ acao_busca }}" method="get" class="bmq-search-wrap" role="search">
+          <span class="bmq-search-icon">{{ icone("buscar", 16) }}</span>
+          <input id="bmq-global-search" name="q" value="{{ q|default('') }}"
+                 placeholder="{{ placeholder_busca }}" aria-label="{{ placeholder_busca }}"
+                 class="bmq-search-input">
+          <kbd class="bmq-search-kbd">/</kbd>
+        </form>
+
+        <!-- Sino de alertas (T13) -->
+        <div style="position:relative; flex-shrink:0;">
+          <button type="button" class="bmq-bell-btn" @click="menuAlertas = !menuAlertas" aria-label="Alertas do sistema">
+            {{ icone("alertas", 18) }}
+            {% if total_alertas_topbar|default(0) > 0 %}
+              <span class="bmq-bell-badge">{{ total_alertas_topbar }}</span>
+            {% endif %}
+          </button>
+          <div x-cloak x-show="menuAlertas" @click.outside="menuAlertas = false"
+               class="bmq-card" style="position:absolute; right:0; top:44px; width:min(340px, calc(100vw - 28px)); padding:12px; z-index:50;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--linha);">
+              <strong style="font-size:13px;">Alertas de estoque e validade</strong>
+              <a href="/estoque" style="font-size:12px; color:var(--rosa); font-weight:700;">Ver todos</a>
+            </div>
+            <div id="bmq-alertas-dropdown" style="padding:10px 4px; font-size:12.5px; color:var(--tinta-suave);">
+              Consulte no painel os itens com estoque baixo e lotes próximos do vencimento.
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="bmq-content">
+      {% block conteudo %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  <main>
+    {% block conteudo_publico %}{{ self.conteudo() }}{% endblock %}
+  </main>
+{% endif %}
+
+<!-- Container Global de Modais HTMX -->
+<div x-cloak x-show="modalAberto" class="bmq-modal-backdrop" role="dialog" aria-modal="true">
+  <div id="bmq-modal-slot" class="bmq-modal" style="max-width:780px;"></div>
+</div>
+
+<!-- Container de Toasts -->
+<div style="position:fixed; bottom:20px; right:20px; z-index:80; display:flex; flex-direction:column; gap:8px;" aria-live="polite">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="bmq-card" style="padding:12px 16px; display:flex; align-items:center; gap:10px; border-left:4px solid var(--rosa);">
+      <span x-text="t.mensagem" style="font-weight:700; font-size:13px;"></span>
+    </div>
+  </template>
+</div>
+
+</body>
+</html>

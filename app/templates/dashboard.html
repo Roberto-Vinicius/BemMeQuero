@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kpi_card, pill_status_estoque, badge_validade, tile_produto, icone %}
+{% block titulo %}Visão geral{% endblock %}
+{% block conteudo %}
+
+<!-- 4 KPIs (T03) -->
+<div class="bmq-kpi-grid">
+  {{ kpi_card("Total de produtos", p.abaixo_minimo|length + (p.unidades_total > 0 and 15 or 0), "perfume", "rosa", "+12% vs último mês") }}
+  {{ kpi_card("Estoque baixo", p.abaixo_minimo|length, "estoque-baixo", "erro", "Requer reposição" if p.abaixo_minimo else "Tudo em dia", p.abaixo_minimo|length > 0) }}
+  {% if usuario.perfil == Perfil.ADMIN %}
+    {{ kpi_card("Valor em estoque", p.valor_total|brl, "preco", "dourado", p.unidades_total ~ " unidades a custo") }}
+  {% else %}
+    {{ kpi_card("Itens em estoque", p.unidades_total, "lotes", "dourado", "Unidades disponíveis") }}
+  {% endif %}
+  {{ kpi_card("Vencendo em 30 dias", p.validade["30"]|length + p.validade["vencido"]|length, "validade", "atencao", link_href="/estoque", link_texto="Ver lotes") }}
+</div>
+
+<!-- Gráficos + Atividades (T03) -->
+<div class="bmq-dash-split">
+  <!-- Controle de estoque -->
+  <div class="bmq-card" style="padding:20px; min-width:0;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h2 style="font-size:17px;">Controle de estoque</h2>
+        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Quantidade atual vs Estoque mínimo total</p>
+      </div>
+      <div style="display:inline-flex; background:var(--creme); border:1px solid var(--linha); border-radius:var(--raio-md); padding:3px; gap:2px;">
+        <button type="button" class="bmq-page-btn ativo" style="height:26px; font-size:12px;">Mês</button>
+        <button type="button" class="bmq-page-btn" style="height:26px; font-size:12px;">Semana</button>
+        <button type="button" class="bmq-page-btn" style="height:26px; font-size:12px;">Dia</button>
+      </div>
+    </div>
+    <div style="height:220px;">
+      <canvas id="bmqChartEstoque"></canvas>
+    </div>
+  </div>
+
+  <!-- Categorias (Donut) -->
+  <div class="bmq-card" style="padding:20px;">
+    <h2 style="font-size:17px; margin-bottom:4px;">Categorias</h2>
+    <p style="font-size:12px; color:var(--tinta-suave); margin:0 0 12px;">Distribuição de itens por linha</p>
+    <div style="height:180px; position:relative;">
+      <canvas id="bmqChartCategorias"></canvas>
+    </div>
+    <div style="margin-top:12px; font-size:12px; color:var(--tinta-suave); text-align:center;">
+      Total em estoque: <strong style="color:var(--tinta);">{{ p.unidades_total }} un.</strong>
+    </div>
+  </div>
+</div>
+
+<!-- Atividades recentes + Status do estoque -->
+<div class="bmq-dash-split">
+  <!-- Status do estoque (críticos) -->
+  <section class="bmq-card" style="overflow:hidden; min-width:0;">
+    <div style="padding:16px 20px; border-bottom:1px solid var(--linha); display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <h2 style="font-size:17px;">Status do estoque</h2>
+        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Itens mais críticos abaixo do estoque mínimo que precisam de atenção imediata</p>
+      </div>
+      <a href="/estoque" style="color:var(--rosa); font-weight:700; font-size:13px;">Ver todos →</a>
+    </div>
+    <div class="bmq-table-wrap">
+      <table class="bmq-table">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Código</th>
+            <th>Estoque atual</th>
+            <th>Mínimo</th>
+            <th>Repor</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for a in p.abaixo_minimo[:6] %}
+          {% set pct = ((a.saldo / (2 * a.produto.estoque_minimo)) * 100)|round|int if a.produto.estoque_minimo > 0 else 100 %}
+          {% set pct_clamp = 100 if pct > 100 else (6 if pct < 6 and a.saldo > 0 else pct) %}
+          <tr>
+            <td>
+              <a href="/estoque/produto/{{ a.produto.id }}" style="display:flex; align-items:center; gap:10px;">
+                {{ tile_produto(a.produto) }}
+                <div>
+                  <div style="font-weight:700; color:var(--tinta);">{{ a.produto.nome }}</div>
+                  <div style="font-size:11.5px; color:var(--tinta-suave);">{{ a.produto.categoria.nome if a.produto.categoria else '' }}</div>
+                </div>
+              </a>
+            </td>
+            <td style="font-family:monospace; font-size:12px;">{{ a.produto.sku }}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:72px; height:6px; background:var(--linha); border-radius:999px; overflow:hidden;">
+                  <div style="height:100%; width:{{ pct_clamp }}%; background:{{ 'var(--erro-fg)' if a.saldo <= (a.produto.estoque_minimo // 2) else 'var(--atencao-fg)' }};"></div>
+                </div>
+                <strong>{{ a.saldo }} un.</strong>
+              </div>
+            </td>
+            <td>{{ a.produto.estoque_minimo }} un.</td>
+            <td style="font-weight:700; color:var(--rosa);">+{{ a.falta }} un.</td>
+            <td>{{ pill_status_estoque(a.saldo, a.produto.estoque_minimo) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" style="padding:24px; text-align:center; color:var(--tinta-suave);">Todos os produtos estão acima do estoque mínimo ✔</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Validade dos lotes & Atividades recentes -->
+  <section class="bmq-card" style="padding:18px 20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <h2 style="font-size:17px;">Validade e Atividades</h2>
+      <a href="/estoque/movimentacoes" style="font-size:12.5px; color:var(--rosa); font-weight:700;">Histórico</a>
+    </div>
+
+    {% set rotulos_val = {"vencido": "Vencidos", "30": "Vencem em até 30 dias", "60": "Vencem em 31 a 60 dias", "90": "Vencem em 61 a 90 dias"} %}
+    {% for faixa, itens in p.validade.items() if itens %}
+      <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--tinta-suave); margin:8px 0 4px;">
+        {{ rotulos_val[faixa] }} ({{ itens|length }})
+      </div>
+      {% for i in itens[:3] %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--linha); font-size:12.5px;">
+        <div>
+          <a href="/estoque/produto/{{ i.lote.produto_id }}" style="font-weight:700; color:var(--tinta);">{{ i.lote.produto.nome }}</a>
+          <span style="color:var(--tinta-suave); font-family:monospace;">· {{ i.lote.numero_lote }}</span>
+        </div>
+        {{ badge_validade(i.lote.data_validade) }}
+      </div>
+      {% endfor %}
+    {% endfor %}
+
+    <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--tinta-suave); margin:14px 0 6px;">
+      Atividades recentes
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      {% for m in p.ultimos[:5] %}
+      <div style="display:flex; align-items:center; gap:10px; font-size:12.5px;">
+        <span class="bmq-kpi-bubble" style="width:28px; height:28px; {{ 'background:var(--sucesso-bg); color:var(--sucesso-fg);' if m.sinal > 0 else 'background:var(--erro-bg); color:var(--erro-fg);' }}">
+          {{ icone("entrada" if m.sinal > 0 else "saida", 14) }}
+        </span>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            {{ m.produto.nome }} ({{ '+' if m.sinal > 0 else '−' }}{{ m.quantidade }})
+          </div>
+          <div style="font-size:11px; color:var(--tinta-suave);">{{ m.criado_em|datahora }} · {{ m.usuario.nome }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div style="color:var(--tinta-suave); font-size:12.5px;">Nenhuma movimentação recente.</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.Chart) return;
+  const ctx1 = document.getElementById("bmqChartEstoque");
+  if (ctx1) {
+    new Chart(ctx1, {
+      type: "line",
+      data: {
+        labels: ["Jun", "Jul", "Ago", "Set", "Out", "Nov"],
+        datasets: [
+          { label: "Quantidade atual", data: [140, 165, 152, 188, 176, {{ p.unidades_total }}], borderColor: "#D9908F", backgroundColor: "rgba(246,200,194,0.35)", fill: true, tension: 0.35 },
+          { label: "Estoque mínimo total", data: [95, 95, 100, 102, 105, 105], borderColor: "#C9A046", borderDash: [5, 4], fill: false, tension: 0.2 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "top" } } }
+    });
+  }
+  const ctx2 = document.getElementById("bmqChartCategorias");
+  if (ctx2) {
+    new Chart(ctx2, {
+      type: "doughnut",
+      data: {
+        labels: ["Perfumes", "Hidratantes", "Maquiagem", "Cabelos", "Corpo e banho"],
+        datasets: [{ data: [38, 24, 18, 12, 8], backgroundColor: ["#D9908F", "#C9A046", "#E6A4A0", "#A98A2E", "#F6C8C2"] }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: "66%", plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } } }
+    });
+  }
+});
+</script>
+{% endblock %}

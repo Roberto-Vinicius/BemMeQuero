@@ -1,0 +1,44 @@
+{% from "_macros.html" import pill, tile_produto, estado_vazio %}
+{% set rotulos = {"entrada": "Entrada", "saida_venda": "Venda", "ajuste": "Ajuste", "perda": "Perda", "devolucao": "Devolução"} %}
+{% set cores_tipo = {"entrada": "sucesso", "saida_venda": "erro", "ajuste": "info", "perda": "atencao", "devolucao": "sucesso"} %}
+<div class="bmq-table-wrap">
+  <table class="bmq-table">
+    <thead>
+      <tr>
+        <th>Data / Hora</th>
+        <th>Tipo</th>
+        <th>Produto</th>
+        <th>Lote</th>
+        <th style="text-align:right;">Quantidade</th>
+        <th>Motivo / Nota</th>
+        <th>Usuário</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in movs %}
+      <tr>
+        <td style="white-space:nowrap; font-size:12.5px; color:var(--tinta-suave);">{{ m.criado_em|datahora }}</td>
+        <td>{{ pill(rotulos[m.tipo.value], cores_tipo[m.tipo.value]) }}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            {{ tile_produto(m.produto) }}
+            <span style="font-weight:700; color:var(--preto);">{{ m.produto.nome }}</span>
+          </div>
+        </td>
+        <td style="font-family:monospace; font-size:12px;">{{ m.lote.numero_lote }}</td>
+        <td style="text-align:right; font-weight:800; color:{{ 'var(--sucesso-fg)' if m.sinal > 0 else 'var(--erro-fg)' }};">
+          {{ '+' if m.sinal > 0 else '−' }}{{ m.quantidade }}
+        </td>
+        <td style="color:var(--tinta-suave);">{{ m.motivo or '—' }}</td>
+        <td style="font-weight:600;">{{ m.usuario.nome }}</td>
+      </tr>
+    {% else %}
+      <tr>
+        <td colspan="7" style="padding:28px; text-align:center; color:var(--tinta-suave);">
+          Nenhuma movimentação encontrada para os filtros selecionados.
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

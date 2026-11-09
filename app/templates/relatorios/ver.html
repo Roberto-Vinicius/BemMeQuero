@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, pill, estado_vazio %}
+{% block titulo %}{{ rel.titulo }}{% endblock %}
+{% block titulo_pagina %}{{ rel.titulo }}{% endblock %}
+{% block conteudo %}
+<div style="margin-bottom:14px;">
+  <a href="/relatorios" style="color:var(--rosa); font-weight:700; font-size:13px;">← Voltar para central de relatórios</a>
+</div>
+
+<section class="bmq-card" style="overflow:hidden;">
+  <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+    <div>
+      <h2 style="font-size:18px; margin:0;">{{ rel.titulo }}</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">{{ rel.subtitulo }}</p>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      {% for fmt, rotulo in [("csv", "CSV"), ("xlsx", "Excel"), ("pdf", "PDF")] %}
+        <a href="/relatorios/{{ slug }}?{{ qs }}{{ '&' if qs }}formato={{ fmt }}" class="bmq-btn bmq-btn-secundario" style="height:34px; font-size:12.5px;">
+          {{ icone("exportar", 15) }} <span>{{ rotulo }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if usa_periodo %}
+  <form method="get" style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:end; gap:12px;">
+    <div>
+      <label class="bmq-label" for="r_inicio">De</label>
+      <input id="r_inicio" type="date" name="inicio" value="{{ f.inicio }}" class="bmq-input">
+    </div>
+    <div>
+      <label class="bmq-label" for="r_fim">Até</label>
+      <input id="r_fim" type="date" name="fim" value="{{ f.fim }}" class="bmq-input">
+    </div>
+    {% if usa_filtros %}
+    <div style="min-width:190px;">
+      <label class="bmq-label" for="r_prod">Produto</label>
+      <select id="r_prod" name="produto_id" class="bmq-select">
+        <option value="">Todos os produtos</option>
+        {% for p in produtos %}
+          <option value="{{ p.id }}" {{ 'selected' if f.produto_id == p.id|string }}>{{ p.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width:160px;">
+      <label class="bmq-label" for="r_tipo">Tipo</label>
+      <select id="r_tipo" name="tipo" class="bmq-select">
+        <option value="">Todos os tipos</option>
+        {% for t in tipos %}
+          <option value="{{ t.value }}" {{ 'selected' if f.tipo == t.value }}>{{ t.value|replace('_', ' ')|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <button type="submit" class="bmq-btn bmq-btn-primario">Filtrar</button>
+  </form>
+  {% endif %}
+
+  <div class="bmq-table-wrap">
+    <table class="bmq-table">
+      <thead>
+        <tr>
+          {% for c in rel.colunas %}
+            <th style="{{ 'text-align:right;' if c.tipo in ['int','qtd_sinal','moeda','pct'] }}">{{ c.titulo }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for l in rel.linhas %}
+        <tr>
+          {% for v in l %}{% set c = rel.colunas[loop.index0] %}
+            <td style="{{ 'text-align:right; white-space:nowrap;' if c.tipo in ['int','qtd_sinal','moeda','pct','data','datahora'] }}">
+              {%- if c.tipo == 'texto' and rel.slug == 'curva-abc' and loop.index0 == 0 -%}
+                {{ pill(v, {'A': 'sucesso', 'B': 'atencao', 'C': 'neutro'}[v]) }}
+              {%- else -%}{{ formatar(v, c.tipo) }}{%- endif -%}
+            </td>
+          {% endfor %}
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{{ rel.colunas|length }}" style="padding:28px; text-align:center; color:var(--tinta-suave);">
+            Nenhum registro no período.
+          </td>
+        </tr>
+      {% endfor %}
+      {% if rel.totais %}
+        <tr style="background:var(--rosa-suave); font-weight:800;">
+          {% for v in rel.totais %}{% set c = rel.colunas[loop.index0] %}
+            <td style="{{ 'text-align:right;' if c.tipo in ['int','qtd_sinal','moeda','pct'] }}">{{ formatar(v, c.tipo) }}</td>
+          {% endfor %}
+        </tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

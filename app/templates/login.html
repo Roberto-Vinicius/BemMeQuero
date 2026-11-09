@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone %}
+{% block titulo %}Entrar{% endblock %}
+{% block conteudo_publico %}
+<div class="bmq-auth-page">
+  <!-- Flor enorme e discreta ao fundo -->
+  <img src="/static/img/logo-flor.svg" alt="" aria-hidden="true" class="bmq-auth-bg-flower">
+
+  <!-- Card central ~750x530 dividido em dois (T01) -->
+  <div class="bmq-card bmq-login-card">
+
+    <!-- Painel esquerdo: rosa-claro (#F6C8C2) com flor grande, Bem Me Quero Perfumaria, slogan e WhatsApp -->
+    <div class="bmq-login-left">
+      <img src="/static/img/logo-flor.svg" alt="Flor Bem Me Quero Perfumaria" class="bmq-login-flower">
+      <h1 class="bmq-login-brand-title">
+        BEM ME QUERO
+      </h1>
+      <div class="bmq-login-brand-sub">
+        Perfumaria
+      </div>
+      <p class="bmq-login-slogan">
+        “Seu momento de amor-próprio”
+      </p>
+      <a href="https://wa.me/5584994420546" target="_blank" rel="noopener" class="bmq-login-wa">
+        <span style="color:var(--verde); display:inline-flex;">{{ icone("whatsapp", 18) }}</span>
+        <span>(84) 9442-0546</span>
+      </a>
+    </div>
+
+    <!-- Painel direito: formulário limpo e centralizado conforme imagem de referência -->
+    <div class="bmq-login-right" x-data="{ mostrarSenha: false, modalEsqueci: false }">
+      {% if erro %}
+      <div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:10px 12px; margin-bottom:16px; font-size:13px; font-weight:700; text-align:center;">
+        {{ erro }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <label class="bmq-label" for="email">E-mail</label>
+          <div style="position:relative;">
+            <input id="email" name="email" type="email" required autofocus value="{{ email }}"
+                   placeholder="seu@email.com" class="bmq-input" style="padding-left:38px; height:42px;">
+            <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--tinta-suave); display:inline-flex;">
+              {{ icone("email", 17) }}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label class="bmq-label" for="senha">Senha</label>
+          <div style="position:relative;">
+            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" required
+                   placeholder="••••••••" class="bmq-input" style="padding-right:40px; height:42px;">
+            <button type="button" @click="mostrarSenha = !mostrarSenha"
+                    :aria-label="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'"
+                    style="position:absolute; right:10px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--tinta-suave); cursor:pointer; padding:4px; display:inline-flex;">
+              <span x-show="!mostrarSenha">{{ icone("olho", 18) }}</span>
+              <span x-cloak x-show="mostrarSenha">{{ icone("olho-riscado", 18) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12.5px; margin-top:2px;">
+          <label style="display:inline-flex; align-items:center; gap:7px; cursor:pointer; color:var(--tinta-suave);">
+            <input type="checkbox" name="lembrar" value="1" style="accent-color:var(--rosa); width:15px; height:15px;"> Lembrar-me
+          </label>
+          <a href="#esqueceu" @click.prevent="modalEsqueci = true" style="color:var(--rosa); font-weight:700;">
+            Esqueceu a senha?
+          </a>
+        </div>
+
+        <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%; height:44px; font-size:14px; margin-top:4px;">
+          Entrar
+        </button>
+      </form>
+
+      <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--linha); text-align:center; font-size:12.5px; color:var(--tinta-suave); line-height:1.5;">
+        Precisa de acesso?
+        <a href="https://wa.me/5584994420546" target="_blank" rel="noopener"
+           style="color:var(--rosa); font-weight:700; text-decoration:underline;">
+          Fale com a administração (84) 9442-0546
+        </a>
+      </div>
+
+      <!-- Modal Esqueceu a senha -->
+      <div x-cloak x-show="modalEsqueci" class="bmq-modal-backdrop" @click.self="modalEsqueci = false">
+        <div class="bmq-modal" style="max-width:400px;">
+          <div class="bmq-modal-header">
+            <h2 class="bmq-modal-title">Recuperar acesso</h2>
+            <button type="button" class="bmq-modal-close" @click="modalEsqueci = false" aria-label="Fechar">
+              {{ icone("fechar", 15) }}
+            </button>
+          </div>
+          <div class="bmq-modal-body" style="font-size:13.5px; color:var(--tinta-suave);">
+            Por segurança, a redefinição de senha é feita pela administração da loja em <strong>Configurações → Usuários</strong>.
+            <div style="margin-top:14px;">
+              <a href="https://wa.me/5584994420546" target="_blank" rel="noopener" class="bmq-btn bmq-btn-primario" style="width:100%;">
+                Chamar administração no WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

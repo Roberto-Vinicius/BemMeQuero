@@ -1,0 +1,231 @@
+{# ==========================================================================
+   Macros de Componentes Visuais — Bem Me Quero · Estoque
+   ========================================================================== #}
+
+{% macro icone(nome, tamanho=20, classe="") -%}
+<svg width="{{ tamanho }}" height="{{ tamanho }}" class="{{ classe }}" aria-hidden="true"><use href="#i-{{ nome }}"/></svg>
+{%- endmacro %}
+
+{# KPI Card: rótulo cinza 12px, valor 24px (800), bolha circular 36px com ícone colorido à direita, variação opcional #}
+{% macro kpi_card(rotulo, valor, icone_nome="painel", tom="rosa", variacao=None, variacao_ruim=False, link_href=None, link_texto=None) %}
+{% set bolhas = {
+  "rosa": "background: var(--rosa-suave); color: var(--rosa);",
+  "dourado": "background: var(--dourado-suave); color: var(--dourado);",
+  "sucesso": "background: var(--sucesso-bg); color: var(--sucesso-fg);",
+  "atencao": "background: var(--atencao-bg); color: var(--atencao-fg);",
+  "erro": "background: var(--erro-bg); color: var(--erro-fg);",
+  "info": "background: var(--info-bg); color: var(--info-fg);"
+} %}
+<div class="bmq-kpi">
+  <div class="min-w-0">
+    <div class="bmq-kpi-label">{{ rotulo }}</div>
+    <div class="bmq-kpi-value">{{ valor }}</div>
+    {% if variacao or link_href %}
+      <div class="bmq-kpi-delta">
+        {% if variacao %}
+          <span style="color: {{ 'var(--erro-fg)' if variacao_ruim else 'var(--sucesso-fg)' }}; font-weight: 700;">{{ variacao }}</span>
+        {% endif %}
+        {% if link_href %}
+          <a href="{{ link_href }}" style="color: var(--rosa); font-weight: 700; text-decoration: underline;">{{ link_texto or 'Ver detalhes' }}</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+  <div class="bmq-kpi-bubble" style="{{ bolhas.get(tom, bolhas['rosa']) }}">
+    {{ icone(icone_nome, 19) }}
+  </div>
+</div>
+{% endmacro %}
+
+{# Pill Semântico: sucesso | atencao | erro | info | neutro #}
+{% macro pill(texto, variante="neutro") -%}
+<span class="bmq-pill bmq-pill-{{ variante }}">{{ texto }}</span>
+{%- endmacro %}
+
+{# Status unificado de estoque: Estável (> mínimo), Atenção (<= mínimo), Crítico (<= 50% do mínimo), Sem estoque (0) #}
+{% macro pill_status_estoque(saldo, minimo) -%}
+{% if saldo <= 0 %}
+  {{ pill("Sem estoque", "erro") }}
+{% elif minimo > 0 and saldo <= (minimo // 2) %}
+  {{ pill("Crítico", "erro") }}
+{% elif minimo > 0 and saldo <= minimo %}
+  {{ pill("Atenção", "atencao") }}
+{% else %}
+  {{ pill("Estável", "sucesso") }}
+{% endif %}
+{%- endmacro %}
+
+{# Badge de validade: vencido/<=30 dias (vermelho), <=60 (âmbar), <=90 (amarelo), >90 (verde) #}
+{% macro badge_validade(data) -%}
+{% if not data %}
+  <span class="text-xs" style="color: var(--tinta-suave);">—</span>
+{% else %}
+  {% set s = situacao_validade(data, hoje()) %}
+  {% set mapa = {
+    "vencido": ("Vencido", "erro"),
+    "30": ("≤ 30 dias", "erro"),
+    "60": ("≤ 60 dias", "atencao"),
+    "90": ("≤ 90 dias", "atencao"),
+    "ok": ("No prazo", "sucesso")
+  } %}
+  {% set rot, var = mapa[s] %}
+  {{ pill(rot, var) }}
+{% endif %}
+{%- endmacro %}
+
+{# Tile de produto: 32px, cantos 6px; foto se houver, senão fundo dourado-suave com ícone #}
+{% macro tile_produto(produto) -%}
+<span class="bmq-tile">
+  {% if produto and produto.foto_path %}
+    <img src="/static/{{ produto.foto_path }}" alt="{{ produto.nome }}">
+  {% else %}
+    {% set cat_nome = (produto.categoria.nome|lower) if (produto and produto.categoria) else '' %}
+    {% if 'perfum' in cat_nome or 'splash' in cat_nome or 'colôn' in cat_nome %}
+      {{ icone("perfume", 18) }}
+    {% else %}
+      {{ icone("cosmeticos", 18) }}
+    {% endif %}
+  {% endif %}
+</span>
+{%- endmacro %}
+
+{# Paginação centralizada com página ativa em rosa-suave e seletor 10/25/50 por página #}
+{% macro paginacao(pagina=1, total_paginas=1, por_pagina=10, total_itens=0, hx_url="") %}
+<div class="bmq-paginacao">
+  <div style="display:flex; align-items:center; gap:8px;">
+    <span>Mostrar</span>
+    <select name="por_pagina" class="bmq-select" style="width:auto; min-height:30px; padding:2px 8px; font-size:12px;"
+            {% if hx_url %}hx-get="{{ hx_url }}" hx-target="#tabela" hx-include="closest form"{% endif %}>
+      {% for n in [10, 25, 50] %}
+        <option value="{{ n }}" {{ 'selected' if por_pagina == n }}>{{ n }}</option>
+      {% endfor %}
+    </select>
+    <span>por página · <strong>{{ total_itens }}</strong> item(ns)</span>
+  </div>
+  <div style="display:flex; align-items:center; gap:4px;">
+    <button type="button" class="bmq-page-btn" {{ 'disabled' if pagina <= 1 }} aria-label="Página anterior">
+      {{ icone("chevron-esquerda", 16) }}
+    </button>
+    {% for p in range(1, (total_paginas if total_paginas > 0 else 1) + 1) %}
+      <button type="button" class="bmq-page-btn {{ 'ativo' if p == pagina }}">{{ p }}</button>
+    {% endfor %}
+    <button type="button" class="bmq-page-btn" {{ 'disabled' if pagina >= total_paginas }} aria-label="Próxima página">
+      {{ icone("chevron-direita", 16) }}
+    </button>
+  </div>
+</div>
+{% endmacro %}
+
+{# Estado vazio com logo-flor e botão de ação #}
+{% macro estado_vazio(titulo="Nenhum item encontrado", subtitulo="Ajuste os filtros ou cadastre o primeiro registro.", acao_texto=None, acao_href=None) %}
+<div class="bmq-empty">
+  <img src="/static/img/logo-flor.svg" alt="">
+  <h3 style="font-size:18px;">{{ titulo }}</h3>
+  <p style="color:var(--tinta-suave); max-width:360px; margin:0;">{{ subtitulo }}</p>
+  {% if acao_texto and acao_href %}
+    <a href="{{ acao_href }}" class="bmq-btn bmq-btn-primario" style="margin-top:6px;">
+      {{ icone("adicionar", 16) }} {{ acao_texto }}
+    </a>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# Componente de Arquivo reutilizável com 4 estados (s09.png: vazio + Procurar, enviando com barra rosa, concluído check verde, erro) #}
+{% macro componente_arquivo(nome="arquivo", aceita=".pdf,.png,.jpg,.xlsx,.csv") %}
+<div x-data="{
+  estado: 'vazio',
+  nomeArquivo: '',
+  progresso: 0,
+  selecionar(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { this.nomeArquivo = f.name; this.estado = 'erro'; return; }
+    this.nomeArquivo = f.name;
+    this.estado = 'enviando';
+    this.progresso = 55;
+    setTimeout(() => { this.progresso = 100; this.estado = 'concluido'; }, 400);
+  }
+}">
+  <label style="display:block; cursor:pointer;">
+    <input type="file" name="{{ nome }}" accept="{{ aceita }}" style="display:none;" @change="selecionar($event)">
+
+    <!-- Estado 1: Vazio (s09.png topo) -->
+    <template x-if="estado === 'vazio'">
+      <div class="bmq-file-bar">
+        <span style="color:var(--tinta-suave); font-size:13.5px;">Nenhum arquivo selecionado</span>
+        <span class="bmq-btn bmq-btn-primario" style="height:34px; padding:0 16px;">Procurar</span>
+      </div>
+    </template>
+
+    <!-- Estado 2: Enviando (s09.png meio: barra rosa preenchendo + ícone tracejado) -->
+    <template x-if="estado === 'enviando'">
+      <div class="bmq-file-bar">
+        <div class="bmq-file-bar-fill" :style="`width:${progresso}%`"></div>
+        <div class="bmq-file-bar-content">
+          <span style="display:inline-flex; align-items:center; gap:8px; font-weight:700; color:#FFFFFF;">
+            {{ icone("planilha", 18) }} <span x-text="nomeArquivo"></span>
+          </span>
+          <span style="color:var(--rosa); width:26px; height:26px; border:1.75px dashed var(--rosa); border-radius:999px; display:inline-flex; align-items:center; justify-content:center;">
+            {{ icone("entrada", 14) }}
+          </span>
+        </div>
+      </div>
+    </template>
+
+    <!-- Estado 3: Concluído (s09.png base: check verde circular) -->
+    <template x-if="estado === 'concluido'">
+      <div class="bmq-file-bar">
+        <span style="display:inline-flex; align-items:center; gap:8px; font-weight:700; color:var(--tinta);">
+          <span style="color:var(--rosa);">{{ icone("planilha", 18) }}</span>
+          <span x-text="nomeArquivo"></span>
+        </span>
+        <span style="width:26px; height:26px; border-radius:999px; background:var(--sucesso-fg); color:#FFFFFF; display:inline-flex; align-items:center; justify-content:center;">
+          {{ icone("confirmado", 16) }}
+        </span>
+      </div>
+    </template>
+
+    <!-- Estado 4: Erro -->
+    <template x-if="estado === 'erro'">
+      <div class="bmq-file-bar" style="border-color:var(--erro-fg); background:var(--erro-bg);">
+        <span style="display:inline-flex; align-items:center; gap:8px; font-weight:700; color:var(--erro-fg);">
+          {{ icone("estoque-baixo", 18) }} <span>Arquivo inválido (máx. 5MB)</span>
+        </span>
+        <span style="font-size:12px; font-weight:700; color:var(--erro-fg); text-decoration:underline;">Tentar de novo</span>
+      </div>
+    </template>
+  </label>
+</div>
+{% endmacro %}
+
+{# Macros legados de formulário mantidos para compatibilidade imediata com todas as telas #}
+{% macro campo(nome, rotulo, v, erros, tipo="text", extra="", obrigatorio=False) %}
+<div>
+  <label class="bmq-label" for="{{ nome }}">{{ rotulo }}{% if obrigatorio %}<span class="obrigatorio">*</span>{% endif %}</label>
+  <input id="{{ nome }}" name="{{ nome }}" type="{{ tipo }}" value="{{ v[nome] if v[nome] is not none else '' }}" {{ extra|safe }}
+         class="bmq-input {{ 'erro' if erros.get(nome) }}"
+         {% if erros.get(nome) %}aria-invalid="true" aria-describedby="erro-{{ nome }}"{% endif %}>
+  {% if erros.get(nome) %}<p id="erro-{{ nome }}" class="bmq-erro-msg">{{ erros[nome] }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro select(nome, rotulo, opcoes, v, erros, obrigatorio=False) %}
+<div>
+  <label class="bmq-label" for="{{ nome }}">{{ rotulo }}{% if obrigatorio %}<span class="obrigatorio">*</span>{% endif %}</label>
+  <select id="{{ nome }}" name="{{ nome }}" class="bmq-select {{ 'erro' if erros.get(nome) }}">
+    <option value="">Selecione…</option>
+    {% for o in opcoes %}
+      <option value="{{ o.id }}" {{ 'selected' if v[nome]|string == o.id|string }}>{{ o.nome }}</option>
+    {% endfor %}
+  </select>
+  {% if erros.get(nome) %}<p class="bmq-erro-msg">{{ erros[nome] }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro alerta(msg) %}
+{% if msg %}
+<div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:10px 14px; margin-bottom:16px; font-weight:600; border:1px solid #F1B9B4;">
+  {{ msg }}
+</div>
+{% endif %}
+{% endmacro %}

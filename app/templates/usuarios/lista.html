@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, kpi_card, pill, alerta %}
+{% block titulo %}Usuários{% endblock %}
+{% block titulo_pagina %}Gestão de usuários{% endblock %}
+{% block conteudo %}
+{% set total_usuarios = usuarios|length %}
+{% set total_ativos = usuarios|selectattr("ativo")|list|length %}
+{% set total_inativos = total_usuarios - total_ativos %}
+
+<div x-data="{ modalNovoUsuario: {{ 'true' if erro else 'false' }}, senha: '', mostrarSenha: false, get temOito() { return this.senha.length >= 8; }, get temLetrasNumeros() { return /[A-Za-zÀ-ÿ]/.test(this.senha) && /[0-9]/.test(this.senha); } }">
+
+  <!-- KPIs T12 -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+    {{ kpi_card("Total de usuários", total_usuarios, "usuarios", "rosa", "Equipes com acesso ao sistema", "neutro") }}
+    {{ kpi_card("Usuários ativos", total_ativos, "confirmado", "sucesso", "Acesso liberado", "positivo") }}
+    {{ kpi_card("Usuários inativos", total_inativos, "relogio", "dourado", "Contas suspensas", "neutro") }}
+  </div>
+
+  {{ alerta(erro) }}
+
+  <!-- Cabeçalho e Ação -->
+  <div class="bmq-card" style="overflow:hidden;">
+    <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Usuários e permissões</h2>
+        <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Gerencie perfis de acesso (Administradora, Estoquista e Vendedora)</p>
+      </div>
+      <button type="button" class="bmq-btn bmq-btn-primario" @click="modalNovoUsuario = true">
+        {{ icone("adicionar", 16) }} <span>Adicionar usuário</span>
+      </button>
+    </div>
+
+    <div class="bmq-table-wrap">
+      <table class="bmq-table">
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>E-mail</th>
+            <th>Perfil / Redefinir senha</th>
+            <th>Último acesso</th>
+            <th>Status</th>
+            <th style="text-align:right;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for u in usuarios %}
+          {% set cor_perfil = 'erro' if u.perfil.value == 'admin' else ('info' if u.perfil.value == 'estoquista' else 'atencao') %}
+          <tr style="{{ 'opacity:0.6;' if not u.ativo }}">
+            <td>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="bmq-avatar">
+                  {% if u.avatar_path %}
+                    <img src="/static/{{ u.avatar_path }}" alt="{{ u.nome }}">
+                  {% else %}
+                    {{ u.iniciais }}
+                  {% endif %}
+                </span>
+                <div>
+                  <div style="font-weight:700; color:var(--preto);">{{ u.nome_completo }}</div>
+                  <div style="font-size:11.5px; color:var(--tinta-suave);">{{ u.cargo or u.perfil.value|capitalize }}</div>
+                </div>
+              </div>
+            </td>
+            <td style="font-family:monospace; font-size:12.5px;">{{ u.email }}</td>
+            <td>
+              <form method="post" action="/usuarios/{{ u.id }}/editar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                {{ pill(u.perfil.value|capitalize, cor_perfil) }}
+                <select name="perfil" class="bmq-select" style="width:auto; height:32px; padding:0 26px 0 10px; font-size:12px;">
+                  {% for p in perfis %}
+                    <option value="{{ p.value }}" {{ 'selected' if u.perfil == p }}>{{ p.value|capitalize }}</option>
+                  {% endfor %}
+                </select>
+                <input name="nova_senha" type="password" placeholder="Nova senha (opcional)"
+                       class="bmq-input" style="width:155px; height:32px; font-size:12px;">
+                <button type="submit" class="bmq-btn bmq-btn-secundario" style="height:32px; padding:0 10px; font-size:12px;">
+                  Salvar
+                </button>
+              </form>
+            </td>
+            <td style="font-size:12.5px; color:var(--tinta-suave);">
+              {{ u.ultimo_acesso|datahora if u.ultimo_acesso else 'Nunca acessou' }}
+            </td>
+            <td>
+              {{ pill('Ativo' if u.ativo else 'Inativo', 'sucesso' if u.ativo else 'neutro') }}
+            </td>
+            <td style="text-align:right;">
+              {% if u.id != usuario.id %}
+              <form method="post" action="/usuarios/{{ u.id }}/ativo" style="display:inline;">
+                <button type="submit" class="bmq-btn bmq-btn-fantasma" style="height:30px; padding:0 10px; font-size:12px;">
+                  {{ 'Inativar' if u.ativo else 'Reativar' }}
+                </button>
+              </form>
+              {% else %}
+              <span style="font-size:12px; color:var(--tinta-suave); font-weight:600;">Sua conta</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal Adicionar Usuário (reutiliza estrutura do T02 Criar Conta) -->
+  <div x-cloak x-show="modalNovoUsuario" class="bmq-modal-backdrop" @click.self="modalNovoUsuario = false">
+    <div class="bmq-modal" style="max-width:520px;">
+      <div class="bmq-modal-header">
+        <div>
+          <h2 class="bmq-modal-title">Adicionar novo usuário</h2>
+          <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Cadastre um novo membro da equipe da perfumaria</p>
+        </div>
+        <button type="button" class="bmq-modal-close" @click="modalNovoUsuario = false" aria-label="Fechar">
+          {{ icone("fechar", 15) }}
+        </button>
+      </div>
+      <form method="post" action="/usuarios">
+        <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
+          <div class="bmq-grid-form-2">
+            <div>
+              <label class="bmq-label" for="u_nome">Nome *</label>
+              <input id="u_nome" name="nome" required placeholder="Ex.: Maria" class="bmq-input">
+            </div>
+            <div>
+              <label class="bmq-label" for="u_sobrenome">Sobrenome</label>
+              <input id="u_sobrenome" name="sobrenome" placeholder="Ex.: Silva" class="bmq-input">
+            </div>
+          </div>
+
+          <div class="bmq-grid-form-2">
+            <div>
+              <label class="bmq-label" for="u_email">E-mail *</label>
+              <input id="u_email" name="email" type="email" required placeholder="maria@bemmequero.local" class="bmq-input">
+            </div>
+            <div>
+              <label class="bmq-label" for="u_perfil">Perfil de acesso *</label>
+              <select id="u_perfil" name="perfil" class="bmq-select">
+                {% for p in perfis %}
+                  <option value="{{ p.value }}">{{ p.value|capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="bmq-label" for="u_senha">Senha inicial (mín. 8 caracteres) *</label>
+            <div style="position:relative;">
+              <input id="u_senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha" required minlength="8"
+                     placeholder="Digite a senha inicial" class="bmq-input" style="padding-right:38px;">
+              <button type="button" @click="mostrarSenha = !mostrarSenha"
+                      style="position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--tinta-suave); cursor:pointer;">
+                <span x-show="!mostrarSenha">{{ icone("olho", 17) }}</span>
+                <span x-cloak x-show="mostrarSenha">{{ icone("olho-riscado", 17) }}</span>
+              </button>
+            </div>
+            <div style="display:flex; gap:14px; margin-top:6px; font-size:11.5px;">
+              <span :style="temOito ? 'color:var(--sucesso-fg); font-weight:700;' : 'color:var(--tinta-suave);'">
+                ● Pelo menos 8 caracteres
+              </span>
+              <span :style="temLetrasNumeros ? 'color:var(--sucesso-fg); font-weight:700;' : 'color:var(--tinta-suave);'">
+                ● Letras e números
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="bmq-modal-footer">
+          <button type="button" class="bmq-btn bmq-btn-secundario" @click="modalNovoUsuario = false">Cancelar</button>
+          <button type="submit" class="bmq-btn bmq-btn-primario">Criar usuário</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

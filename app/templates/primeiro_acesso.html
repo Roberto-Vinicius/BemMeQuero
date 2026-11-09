@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone %}
+{% block titulo %}Criar conta · Primeiro acesso{% endblock %}
+{% block conteudo_publico %}
+<div class="bmq-auth-page">
+  <img src="/static/img/logo-flor.svg" alt="" aria-hidden="true" class="bmq-auth-bg-flower">
+
+  <!-- Card central dividido em dois (T02 - s02.png) -->
+  <div class="bmq-card bmq-login-card">
+
+    <!-- Painel esquerdo: logo + slogan -->
+    <div class="bmq-login-left">
+      <img src="/static/img/logo-flor.svg" alt="Flor Bem Me Quero Perfumaria" class="bmq-login-flower">
+      <h1 class="bmq-login-brand-title">
+        BEM ME QUERO
+      </h1>
+      <div class="bmq-login-brand-sub">
+        Perfumaria
+      </div>
+      <p class="bmq-login-slogan">
+        “Seu momento de amor-próprio”
+      </p>
+      <a href="https://wa.me/5584994420546" target="_blank" rel="noopener" class="bmq-login-wa">
+        <span style="color:var(--verde); display:inline-flex;">{{ icone("whatsapp", 18) }}</span>
+        <span>(84) 9442-0546</span>
+      </a>
+    </div>
+
+    <!-- Painel direito: Formulário Criar conta com checklist de senha ao vivo -->
+    <div class="bmq-login-right"
+         x-data="{
+           senha: '',
+           confirmacao: '',
+           mostrarSenha: false,
+           get temOito() { return this.senha.length >= 8; },
+           get temLetrasNumeros() { return /[A-Za-zÀ-ÿ]/.test(this.senha) && /[0-9]/.test(this.senha); }
+         }">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-family:'Playfair Display',Georgia,serif; font-size:23px; font-weight:600; color:var(--preto);">Criar conta</h2>
+        <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Configure a conta administradora inicial da loja</p>
+      </div>
+
+      {% if erro %}
+      <div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:10px 12px; margin-bottom:14px; font-size:12.5px; font-weight:700;">
+        {{ erro }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/primeiro-acesso" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="nome">Nome *</label>
+            <input id="nome" name="nome" required value="{{ nome|default('') }}" placeholder="Maria" class="bmq-input">
+          </div>
+          <div>
+            <label class="bmq-label" for="sobrenome">Sobrenome</label>
+            <input id="sobrenome" name="sobrenome" value="{{ sobrenome|default('') }}" placeholder="Silva" class="bmq-input">
+          </div>
+        </div>
+
+        <div>
+          <label class="bmq-label" for="email">E-mail *</label>
+          <input id="email" name="email" type="email" required value="{{ email|default('') }}" placeholder="admin@bemmequero.com.br" class="bmq-input">
+        </div>
+
+        <div>
+          <label class="bmq-label" for="senha">Senha *</label>
+          <div style="position:relative;">
+            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha" required minlength="8"
+                   placeholder="Crie uma senha forte" class="bmq-input" style="padding-right:38px;">
+            <button type="button" @click="mostrarSenha = !mostrarSenha"
+                    style="position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--tinta-suave); cursor:pointer;">
+              <span x-show="!mostrarSenha">{{ icone("olho", 17) }}</span>
+              <span x-cloak x-show="mostrarSenha">{{ icone("olho-riscado", 17) }}</span>
+            </button>
+          </div>
+          <!-- Checklist ao vivo (s02.png) -->
+          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:6px; font-size:11.5px;">
+            <span style="display:inline-flex; align-items:center; gap:5px;" :style="temOito ? 'color:var(--sucesso-fg); font-weight:700;' : 'color:var(--tinta-suave);'">
+              <span style="width:14px; height:14px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:10px;"
+                    :style="temOito ? 'background:var(--sucesso-bg); color:var(--sucesso-fg);' : 'border:1.5px solid var(--linha);'">
+                <span x-show="temOito">✓</span>
+              </span>
+              Pelo menos 8 caracteres
+            </span>
+            <span style="display:inline-flex; align-items:center; gap:5px;" :style="temLetrasNumeros ? 'color:var(--sucesso-fg); font-weight:700;' : 'color:var(--tinta-suave);'">
+              <span style="width:14px; height:14px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:10px;"
+                    :style="temLetrasNumeros ? 'background:var(--sucesso-bg); color:var(--sucesso-fg);' : 'border:1.5px solid var(--linha);'">
+                <span x-show="temLetrasNumeros">✓</span>
+              </span>
+              Letras e números
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label class="bmq-label" for="confirmacao">Confirmação de senha *</label>
+          <input id="confirmacao" name="confirmacao" :type="mostrarSenha ? 'text' : 'password'" x-model="confirmacao" required minlength="8"
+                 placeholder="Repita a senha" class="bmq-input">
+        </div>
+
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--tinta-suave); cursor:pointer; margin-top:2px;">
+          <input type="checkbox" name="termos" value="on" required checked style="accent-color:var(--rosa); margin-top:2px;">
+          <span>Concordo com os <strong>Termos de Serviço</strong> e a <strong>Política de Privacidade</strong> da Bem Me Quero Perfumaria.</span>
+        </label>
+
+        <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%; height:40px; margin-top:4px;">
+          Criar conta
+        </button>
+      </form>
+
+      <div style="margin-top:14px; text-align:center; font-size:12px; color:var(--tinta-suave);">
+        Já possui acesso? <a href="/login" style="color:var(--rosa); font-weight:700;">Entrar no sistema</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %}Erro {{ codigo }}{% endblock %}
+{% block conteudo %}
+<div style="min-height:65vh; display:flex; align-items:center; justify-content:center; padding:24px;">
+  <div class="bmq-card" style="max-width:440px; width:100%; padding:36px 28px; text-align:center;">
+    <img src="/static/img/logo-flor.svg" alt="" style="width:72px; height:72px; margin:0 auto 12px;">
+    <div style="font-family:'Playfair Display',Georgia,serif; font-size:40px; font-weight:700; color:var(--rosa); line-height:1;">
+      {{ codigo }}
+    </div>
+    <p style="font-size:15px; font-weight:700; color:var(--preto); margin:10px 0 20px;">{{ mensagem }}</p>
+    <a href="/" class="bmq-btn bmq-btn-primario">Voltar ao início</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, pill, alerta %}
+{% block titulo %}Sistema{% endblock %}
+{% block titulo_pagina %}Configurações do sistema{% endblock %}
+{% block conteudo %}
+
+{% if salvo %}
+<div class="bmq-pill-sucesso" style="border-radius:var(--raio-md); padding:10px 14px; margin-bottom:16px; font-size:13px; font-weight:700;">
+  Alterações salvas com sucesso!
+</div>
+{% endif %}
+{{ alerta(erro) }}
+
+<!-- Layout em 2 Colunas do Figma Estocaê (T11 - s15.png) -->
+<div class="bmq-grid-2col">
+
+  <!-- COLUNA ESQUERDA: Configurações do Sistema + Estoque + Notificações por E-mail -->
+  {% if usuario.perfil == Perfil.ADMIN %}
+  <form method="post" action="/sistema/configuracoes"
+        x-data="{
+          listaEmails: {{ emails|tojson }},
+          novoEmail: '',
+          adicionarEmail() {
+            const v = this.novoEmail.trim().toLowerCase();
+            if (v && v.includes('@') && !this.listaEmails.includes(v)) {
+              this.listaEmails.push(v);
+              this.novoEmail = '';
+            }
+          },
+          removerEmail(idx) {
+            this.listaEmails.splice(idx, 1);
+          }
+        }"
+        style="display:flex; flex-direction:column; gap:22px; min-width:0;">
+
+    <!-- Card 1: Configurações do Sistema -->
+    <section class="bmq-card" style="padding:22px;">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+        <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("configuracoes", 16) }}</span>
+        <h2 style="font-size:16px; margin:0;">Configurações do sistema</h2>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div>
+          <label class="bmq-label" for="nome_empresa">Nome da empresa</label>
+          <input id="nome_empresa" name="nome_empresa" value="{{ cfg.nome_empresa }}" class="bmq-input">
+        </div>
+
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="fuso_horario">Fuso horário</label>
+            <select id="fuso_horario" name="fuso_horario" class="bmq-select">
+              <option value="America/Fortaleza" {{ 'selected' if cfg.fuso_horario == 'America/Fortaleza' }}>America/Fortaleza (BRT -03:00)</option>
+              <option value="America/Sao_Paulo" {{ 'selected' if cfg.fuso_horario == 'America/Sao_Paulo' }}>America/Sao_Paulo (BRT -03:00)</option>
+            </select>
+          </div>
+          <div>
+            <label class="bmq-label" for="formato_data">Formato de data</label>
+            <select id="formato_data" name="formato_data" class="bmq-select">
+              <option value="DD/MM/AAAA" {{ 'selected' if cfg.formato_data == 'DD/MM/AAAA' }}>DD/MM/AAAA</option>
+              <option value="AAAA-MM-DD" {{ 'selected' if cfg.formato_data == 'AAAA-MM-DD' }}>AAAA-MM-DD</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="moeda_padrao">Moeda padrão</label>
+            <select id="moeda_padrao" name="moeda_padrao" class="bmq-select">
+              <option value="BRL">Real Brasileiro (R$ - BRL)</option>
+            </select>
+          </div>
+          <div>
+            <label class="bmq-label" for="idioma">Idioma</label>
+            <select id="idioma" name="idioma" class="bmq-select">
+              <option value="pt-BR">Português (Brasil)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Card 2: Configurações do Estoque -->
+    <section class="bmq-card" style="padding:22px;">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+        <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("lotes", 16) }}</span>
+        <h2 style="font-size:16px; margin:0;">Configurações do estoque</h2>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="limite_estoque_baixo_padrao">Estoque mínimo padrão (un.)</label>
+            <input id="limite_estoque_baixo_padrao" name="limite_estoque_baixo_padrao" type="number" min="0"
+                   value="{{ cfg.nivel_minimo_padrao }}" class="bmq-input">
+          </div>
+          <div>
+            <label class="bmq-label" for="dias_alerta_validade">Alerta de vencimento próximo (dias)</label>
+            <input id="dias_alerta_validade" name="dias_alerta_validade" type="number" min="1"
+                   value="{{ cfg.antecedencia_vencimento_dias }}" class="bmq-input">
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; padding-top:4px;">
+          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:13px;">
+            <span>Notificações automáticas de estoque baixo</span>
+            <input type="checkbox" name="notificar_estoque_baixo" class="bmq-toggle" {{ 'checked' if cfg.notificar_estoque_baixo }}>
+          </label>
+          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:13px;">
+            <span>Bloquear saída sem saldo ou com lote vencido</span>
+            <input type="checkbox" name="bloquear_saida_sem_estoque" class="bmq-toggle" {{ 'checked' if not cfg.permitir_estoque_negativo }}>
+          </label>
+          <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:13px;">
+            <span>Sugerir e baixar lote por FEFO automaticamente</span>
+            <input type="checkbox" name="sugerir_fefo_automatico" class="bmq-toggle" {{ 'checked' if cfg.ativar_lotes }}>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Card 3: Notificações por E-mail (s15.png) -->
+    <section class="bmq-card" style="padding:22px;">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+        <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("email", 16) }}</span>
+        <h2 style="font-size:16px; margin:0;">Notificações por e-mail</h2>
+      </div>
+
+      <input type="hidden" name="emails_notificacao" :value="listaEmails.join(', ')">
+
+      <div class="bmq-input-group" style="margin-bottom:12px;">
+        <input type="email" x-model="novoEmail" @keydown.enter.prevent="adicionarEmail()"
+               placeholder="Adicionar endereço de e-mail para alertas…" class="bmq-input">
+        <button type="button" class="bmq-input-addon-btn" @click="adicionarEmail()" title="Adicionar e-mail">
+          {{ icone("adicionar", 16) }}
+        </button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <template x-for="(em, idx) in listaEmails" :key="em">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:var(--raio-md); background:rgba(252,250,237,0.85); border:1px solid var(--linha); font-size:13px;">
+            <span style="display:inline-flex; align-items:center; gap:8px; font-weight:600;">
+              <span style="color:var(--dourado);">{{ icone("email", 14) }}</span>
+              <span x-text="em"></span>
+            </span>
+            <button type="button" @click="removerEmail(idx)" style="border:0; background:transparent; color:var(--erro-fg); cursor:pointer;" aria-label="Remover">
+              {{ icone("fechar", 14) }}
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <div style="margin-top:16px; text-align:right;">
+        <button type="submit" class="bmq-btn bmq-btn-primario">
+          {{ icone("confirmado", 16) }} <span>Salvar configurações</span>
+        </button>
+      </div>
+    </section>
+  </form>
+  {% endif %}
+
+  <!-- COLUNA DIREITA: Perfil do Usuário + Informações do Sistema (s15.png) -->
+  <div style="display:flex; flex-direction:column; gap:22px; min-width:0;">
+
+    <!-- Card 4: Perfil do Usuário (s15.png) -->
+    <section id="perfil" class="bmq-card" style="padding:22px;"
+             x-data="{ avatarPreview: '{{ ('/static/' ~ usuario.avatar_path) if usuario.avatar_path else '' }}' }">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+        <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("usuarios", 16) }}</span>
+        <h2 style="font-size:16px; margin:0;">Perfil do usuário</h2>
+      </div>
+
+      <form method="post" action="/sistema/perfil" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Avatar circular grande com botão câmera dourado (s15.png) -->
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">
+          <div style="position:relative; width:72px; height:72px;">
+            <span class="bmq-avatar" style="width:72px; height:72px; font-size:24px;">
+              <template x-if="avatarPreview">
+                <img :src="avatarPreview" alt="{{ usuario.nome }}">
+              </template>
+              <template x-if="!avatarPreview">
+                <span>{{ usuario.iniciais }}</span>
+              </template>
+            </span>
+            <label for="input_avatar" title="Alterar foto do perfil"
+                   style="position:absolute; right:-2px; bottom:-2px; width:28px; height:28px; border-radius:999px; background:var(--dourado); color:#fff; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(8,7,6,0.2);">
+              {{ icone("camera", 14) }}
+              <input id="input_avatar" name="avatar" type="file" accept=".jpg,.jpeg,.png,.webp" style="display:none;"
+                     @change="if ($event.target.files[0]) avatarPreview = URL.createObjectURL($event.target.files[0])">
+            </label>
+          </div>
+          <div>
+            <div style="font-weight:800; font-size:15px; color:var(--preto);">{{ usuario.nome_completo }}</div>
+            <div style="font-size:12px; color:var(--tinta-suave);">{{ usuario.email }} · {{ usuario.perfil.value|capitalize }}</div>
+          </div>
+        </div>
+
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="p_nome">Nome *</label>
+            <input id="p_nome" name="nome" required value="{{ usuario.nome }}" class="bmq-input">
+          </div>
+          <div>
+            <label class="bmq-label" for="p_sobrenome">Sobrenome</label>
+            <input id="p_sobrenome" name="sobrenome" value="{{ usuario.sobrenome or '' }}" class="bmq-input">
+          </div>
+        </div>
+
+        <div class="bmq-grid-form-2">
+          <div>
+            <label class="bmq-label" for="p_telefone">Telefone / WhatsApp</label>
+            <input id="p_telefone" name="telefone" value="{{ usuario.telefone or '' }}" placeholder="(84) 9442-0546" class="bmq-input">
+          </div>
+          <div>
+            <label class="bmq-label" for="p_cargo">Cargo na loja</label>
+            <input id="p_cargo" name="cargo" value="{{ usuario.cargo or usuario.perfil.value|capitalize }}" class="bmq-input">
+          </div>
+        </div>
+
+        <div style="padding-top:10px; border-top:1px solid var(--linha);">
+          <div style="font-weight:700; font-size:13px; margin-bottom:10px;">Alterar senha (opcional)</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+            <div>
+              <label class="bmq-label" for="senha_atual">Senha atual</label>
+              <input id="senha_atual" name="senha_atual" type="password" class="bmq-input">
+            </div>
+            <div>
+              <label class="bmq-label" for="nova_senha">Nova senha</label>
+              <input id="nova_senha" name="nova_senha" type="password" minlength="8" class="bmq-input">
+            </div>
+            <div>
+              <label class="bmq-label" for="confirmar_senha">Confirmar nova senha</label>
+              <input id="confirmar_senha" name="confirmar_senha" type="password" minlength="8" class="bmq-input">
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:right; margin-top:4px;">
+          <button type="submit" class="bmq-btn bmq-btn-primario">
+            {{ icone("confirmado", 16) }} <span>Salvar perfil</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Card 5: Informações do Sistema + Fazer Backup Agora (s15.png) -->
+    <section class="bmq-card" style="padding:22px;">
+      <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:16px; border-bottom:1px solid var(--linha);">
+        <span class="bmq-kpi-bubble d-dourado" style="width:32px; height:32px;">{{ icone("loja", 16) }}</span>
+        <h2 style="font-size:16px; margin:0;">Informações do sistema</h2>
+      </div>
+
+      <!-- Banner Verde "Sistema Atualizado" igual ao Figma (s15.png) -->
+      <div style="padding:12px 14px; border-radius:var(--raio-md); background:var(--sucesso-bg); color:var(--sucesso-fg); display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        {{ icone("confirmado", 18) }}
+        <div>
+          <div style="font-weight:800; font-size:13px;">Sistema atualizado</div>
+          <div style="font-size:11.5px;">Todos os serviços e bibliotecas locais (modo offline) estão operando normalmente.</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; margin-bottom:18px;">
+        <div style="padding:10px 12px; border-radius:var(--raio-md); background:rgba(252,250,237,0.8); border:1px solid var(--linha);">
+          <div style="font-size:11px; color:var(--tinta-suave); text-transform:uppercase; font-weight:700;">Versão</div>
+          <div style="font-weight:800; color:var(--preto); margin-top:2px;">Bem Me Quero v2.4.0</div>
+        </div>
+        <div style="padding:10px 12px; border-radius:var(--raio-md); background:rgba(252,250,237,0.8); border:1px solid var(--linha);">
+          <div style="font-size:11px; color:var(--tinta-suave); text-transform:uppercase; font-weight:700;">Banco de dados</div>
+          <div style="font-weight:800; color:var(--preto); margin-top:2px;">SQLite 3 · Pronto PostgreSQL</div>
+        </div>
+        <div style="padding:10px 12px; border-radius:var(--raio-md); background:rgba(252,250,237,0.8); border:1px solid var(--linha); grid-column: 1 / -1;">
+          <div style="font-size:11px; color:var(--tinta-suave); text-transform:uppercase; font-weight:700;">Último backup realizado</div>
+          <div style="font-weight:700; color:var(--preto); margin-top:2px;">
+            {{ cfg.ultimo_backup_em|datahora if cfg.ultimo_backup_em else 'Ainda não exportado nesta sessão' }}
+          </div>
+        </div>
+      </div>
+
+      {% if usuario.perfil == Perfil.ADMIN %}
+      <a href="/sistema/backup" class="bmq-btn bmq-btn-secundario" style="width:100%;">
+        {{ icone("exportar", 16) }} <span>Fazer backup agora (baixar cópia do banco)</span>
+      </a>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+{% endblock %}

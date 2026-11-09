@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, kpi_card, componente_arquivo %}
+{% block titulo %}Produtos{% endblock %}
+{% block titulo_pagina %}Catálogo de produtos{% endblock %}
+{% block conteudo %}
+{% set k = kpis|default({'total': produtos|length, 'ativos': produtos|selectattr('ativo')|list|length, 'inativos': 0, 'sem_estoque': 0}) %}
+
+<div x-data="{ modalImportar: false }">
+  <!-- 4 KPIs de Produtos (T04 - s04.png) -->
+  <div class="bmq-kpi-grid" style="margin-bottom:24px;">
+    {{ kpi_card("Total de produtos", k.total, "perfume", "rosa", "Itens cadastrados no catálogo", "neutro") }}
+    {{ kpi_card("Produtos ativos", k.ativos, "confirmado", "sucesso", "Disponíveis para operação", "positivo") }}
+    {{ kpi_card("Produtos inativos", k.inativos, "relogio", "dourado", "Itens arquivados", "neutro") }}
+    {{ kpi_card("Fora de estoque", k.sem_estoque, "estoque-baixo", "erro", "Ativos com saldo zerado", "negativo" if k.sem_estoque > 0 else "positivo") }}
+  </div>
+
+  {% if request and request.query_params.get('importados') %}
+  <div class="bmq-pill-sucesso" style="border-radius:var(--raio-md); padding:12px 16px; margin-bottom:16px; font-size:13px; font-weight:700;">
+    Pedido / Nota Fiscal <strong>{{ request.query_params.get('nf', '') }}</strong> importado com sucesso:
+    <strong>{{ request.query_params.get('importados') }}</strong> item(ns) processado(s)
+    ({{ request.query_params.get('criados', '0') }} novo(s) no catálogo) e
+    <strong>+{{ request.query_params.get('unidades', '0') }} un.</strong> adicionadas automaticamente ao estoque!
+  </div>
+  {% endif %}
+  {% if request and request.query_params.get('erro_importacao') %}
+  <div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:12px 16px; margin-bottom:16px; font-size:13px; font-weight:700;">
+    {{ request.query_params.get('erro_importacao') }}
+  </div>
+  {% endif %}
+
+  <!-- Card Principal: Inventário de produtos (s04.png) -->
+  <section class="bmq-card" style="overflow:hidden;">
+    <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <h2 style="font-size:18px; margin:0;">Inventário de produtos</h2>
+        <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Gerencie seus itens, fragrâncias, cosméticos e níveis de estoque</p>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+        {% if usuario.perfil != Perfil.VENDEDOR %}
+          <a href="/cadastros/marcas" class="bmq-btn bmq-btn-fantasma" style="height:36px; font-size:12.5px;">Marcas</a>
+          <a href="/cadastros/categorias" class="bmq-btn bmq-btn-fantasma" style="height:36px; font-size:12.5px;">Categorias</a>
+          <button type="button" class="bmq-btn bmq-btn-secundario" @click="modalImportar = true">
+            {{ icone("upload", 16) }} <span>Importar Pedido / NF-e</span>
+          </button>
+        {% endif %}
+        <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
+          {{ icone("exportar", 16) }} <span>Exportar</span>
+        </a>
+        {% if usuario.perfil != Perfil.VENDEDOR %}
+          <a href="/produtos/novo" class="bmq-btn bmq-btn-primario">
+            {{ icone("adicionar", 16) }} <span>Adicionar produto</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Barra de filtros acima da tabela (T04) -->
+    <form style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; gap:12px;"
+          hx-get="/produtos" hx-target="#tabela" hx-trigger="input delay:300ms from:#q, change">
+      <div style="position:relative; flex:1; min-width:240px;">
+        <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--tinta-suave);">
+          {{ icone("buscar", 16) }}
+        </span>
+        <input id="q" name="q" value="{{ q }}" placeholder="Buscar por nome, marca, SKU ou código de barras…"
+               class="bmq-input" style="padding-left:34px;">
+      </div>
+
+      <select name="categoria_id" class="bmq-select" style="width:auto; min-width:190px;" aria-label="Filtrar por categoria">
+        <option value="">Todas as categorias</option>
+        {% for c in categorias %}
+          <option value="{{ c.id }}" {{ 'selected' if categoria_id == c.id }}>{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+
+      <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--tinta-suave); cursor:pointer; padding:0 6px;">
+        <input type="checkbox" name="inativos" value="true" {{ 'checked' if inativos }} style="accent-color:var(--rosa);">
+        <span>Mostrar inativos</span>
+      </label>
+    </form>
+
+    <div id="tabela">{% include "produtos/_tabela.html" %}</div>
+  </section>
+
+  <!-- Modal T05: Importar Pedido / DANFE PDF / XML NF-e / Planilha (s05.png + s09.png) -->
+  <div x-cloak x-show="modalImportar" class="bmq-modal-backdrop" @click.self="modalImportar = false"
+       x-data="{ nomeArquivo: '', estadoUpload: 'vazio' }">
+    <div class="bmq-modal" style="max-width:540px;">
+      <div class="bmq-modal-header">
+        <div>
+          <h2 class="bmq-modal-title">Importar Pedido / Nota Fiscal (DANFE)</h2>
+          <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Envie o PDF da DANFE, XML da NF-e ou planilha (.csv / .xlsx) para cadastrar produtos, fornecedor e dar entrada automática no estoque</p>
+        </div>
+        <button type="button" class="bmq-modal-close" @click="modalImportar = false" aria-label="Fechar">
+          {{ icone("fechar", 15) }}
+        </button>
+      </div>
+      <form method="post" action="/produtos/importar" enctype="multipart/form-data">
+        <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
+          <label for="input_planilha_prod" class="bmq-dropzone">
+            <span class="bmq-kpi-bubble d-dourado" style="width:48px; height:48px;">
+              {{ icone("planilha", 24) }}
+            </span>
+            <div style="font-weight:700; font-size:14px; color:var(--preto);">
+              Arraste o PDF da Nota Fiscal / Pedido aqui ou <span style="color:var(--dourado); text-decoration:underline;">Abrir arquivos</span>
+            </div>
+            <div style="font-size:12px; color:var(--tinta-suave);">
+              Aceita: <strong>.PDF (DANFE / Pedido)</strong>, <strong>.XML (NF-e)</strong>, <strong>.XLSX</strong> ou <strong>.CSV</strong>
+            </div>
+            <input id="input_planilha_prod" name="arquivo" type="file" accept=".pdf,.xml,.csv,.xlsx" required style="display:none;"
+                   @change="if ($event.target.files.length) { nomeArquivo = $event.target.files[0].name; estadoUpload = 'enviando'; setTimeout(() => estadoUpload = 'concluido', 350); }">
+          </label>
+
+          <!-- Barra de arquivo com os estados do Figma (s09.png) -->
+          <div class="bmq-filebar" :class="{ 'concluido': estadoUpload === 'concluido' }">
+            <template x-if="estadoUpload === 'enviando'">
+              <div class="bmq-filebar-progress" style="width: 65%;"></div>
+            </template>
+            <div class="bmq-filebar-content">
+              <span style="font-weight:600; color:var(--tinta);" x-text="nomeArquivo || 'Nenhum arquivo selecionado'"></span>
+              <template x-if="estadoUpload === 'vazio'">
+                <label for="input_planilha_prod" class="bmq-btn bmq-btn-secundario" style="height:28px; padding:0 12px; font-size:12px; cursor:pointer;">
+                  Procurar
+                </label>
+              </template>
+              <template x-if="estadoUpload === 'concluido'">
+                <span style="width:22px; height:22px; border-radius:999px; background:var(--sucesso-fg); color:#fff; display:inline-flex; align-items:center; justify-content:center;">
+                  {{ icone("confirmado", 14) }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; font-size:12.5px;">
+            <span style="color:var(--tinta-suave);">Precisa do modelo padrão?</span>
+            <a href="/produtos/importar/modelo" style="color:var(--dourado-escuro); font-weight:700; text-decoration:underline;">
+              Baixar planilha modelo (.csv)
+            </a>
+          </div>
+        </div>
+        <div class="bmq-modal-footer">
+          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;" :disabled="!nomeArquivo">
+            Importar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

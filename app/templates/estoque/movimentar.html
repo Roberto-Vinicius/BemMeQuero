@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, campo, alerta %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block titulo_pagina %}Movimentação de estoque{% endblock %}
+{% block conteudo %}
+{{ alerta(erro_geral) }}
+
+<!-- Card T10: Nova Movimentação estilo Estocaê (s13.png) -->
+<section class="bmq-card" style="padding:24px; max-width:920px;">
+  <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
+    <div>
+      <h2 style="font-size:19px; margin:0;">{{ titulo }}</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Selecione o tipo de operação e preencha os dados do lote</p>
+    </div>
+    <a href="/estoque/movimentacoes" class="bmq-btn bmq-btn-fantasma">Ver histórico completo →</a>
+  </div>
+
+  <!-- Seletor segmentado de 3 botões largos do Figma (s13.png) + operações complementares -->
+  <div class="bmq-seg-mov">
+    {% if usuario.perfil != Perfil.VENDEDOR %}
+      <a href="/estoque/movimentar/entrada" class="bmq-seg-mov-btn {{ 'ativo' if tipo == 'entrada' }}">
+        {{ icone("entrada", 17) }} <span>Entrada</span>
+      </a>
+    {% endif %}
+    <a href="/estoque/movimentar/venda" class="bmq-seg-mov-btn {{ 'ativo' if tipo == 'venda' }}">
+      {{ icone("saida", 17) }} <span>Saída / Venda</span>
+    </a>
+    {% if usuario.perfil != Perfil.VENDEDOR %}
+      <a href="/estoque/movimentar/ajuste" class="bmq-seg-mov-btn {{ 'ativo' if tipo == 'ajuste' }}">
+        {{ icone("setas-trocadas", 17) }} <span>Ajuste</span>
+      </a>
+    {% endif %}
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:18px;">
+    <a href="/estoque/movimentar/devolucao" class="bmq-btn {{ 'bmq-btn-primario' if tipo == 'devolucao' else 'bmq-btn-secundario' }}" style="height:30px; font-size:12px;">
+      Devolução de cliente
+    </a>
+    {% if usuario.perfil != Perfil.VENDEDOR %}
+    <a href="/estoque/movimentar/perda" class="bmq-btn {{ 'bmq-btn-primario' if tipo == 'perda' else 'bmq-btn-secundario' }}" style="height:30px; font-size:12px;">
+      Perda / Avaria / Vencimento
+    </a>
+    {% endif %}
+  </div>
+
+  <form method="post" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+    <div style="grid-column: 1 / -1;">
+      <label class="bmq-label" for="produto_id">Produto *</label>
+      <select id="produto_id" name="produto_id" required class="bmq-select {{ 'erro' if erros.produto_id }}"
+              {% if usa_lote %}hx-get="/estoque/lotes-options?tipo={{ tipo }}" hx-target="#lote_id" hx-trigger="change"{% endif %}>
+        <option value="">Pesquise ou selecione um produto…</option>
+        {% for p in produtos %}
+          <option value="{{ p.id }}" {{ 'selected' if v.produto_id|string == p.id|string }}>{{ p.nome }} ({{ p.sku }})</option>
+        {% endfor %}
+      </select>
+      {% if erros.produto_id %}<p class="bmq-erro-msg">{{ erros.produto_id }}</p>{% endif %}
+    </div>
+
+    {% if usa_lote %}
+    <div style="grid-column: 1 / -1;">
+      <label class="bmq-label" for="lote_id">Lote *</label>
+      <select id="lote_id" name="lote_id" required class="bmq-select {{ 'erro' if erros.lote_id }}">
+        {% include "estoque/_lotes_options.html" %}
+      </select>
+      {% if erros.lote_id %}<p class="bmq-erro-msg">{{ erros.lote_id }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if tipo == "entrada" %}
+      {{ campo("numero_lote", "Número do lote *", v, erros, extra='placeholder="Ex.: LOTE-2026-01"') }}
+      {{ campo("data_validade", "Data de validade *", v, erros, "date") }}
+      {{ campo("quantidade", "Quantidade recebida *", v, erros, "number", 'min="1"') }}
+      {{ campo("custo_unitario", "Custo unitário (R$) *", v, erros, extra='inputmode="decimal" placeholder="59,90"') }}
+      <div>
+        <label class="bmq-label" for="fornecedor_id">Fornecedor (opcional)</label>
+        <select id="fornecedor_id" name="fornecedor_id" class="bmq-select">
+          <option value="">Selecione um fornecedor…</option>
+          {% for f in fornecedores %}
+            <option value="{{ f.id }}" {{ 'selected' if v.fornecedor_id|string == f.id|string }}>{{ f.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {{ campo("motivo", "Nº da Nota Fiscal / Observação", v, erros, extra='placeholder="Ex.: NF 4521 - Compra mensal"') }}
+    {% elif tipo == "venda" %}
+      {{ campo("quantidade", "Quantidade de saída *", v, erros, "number", 'min="1"') }}
+      {{ campo("preco_unitario", "Preço unitário praticado (R$) — vazio usa tabela", v, erros, extra='inputmode="decimal"') }}
+      <div style="grid-column: 1 / -1; padding:10px 14px; border-radius:var(--raio-md); background:var(--dourado-suave); color:var(--preto); font-size:12.5px;">
+        <strong>Regra FEFO ativa:</strong> O sistema baixa automaticamente o(s) lote(s) com validade mais próxima. Lotes vencidos são bloqueados.
+      </div>
+    {% elif tipo == "ajuste" %}
+      {{ campo("contagem_real", "Contagem física real do lote *", v, erros, "number", 'min="0"') }}
+      {{ campo("motivo", "Motivo do ajuste de inventário *", v, erros, extra='placeholder="Ex.: Conferência de balanço mensal"') }}
+    {% else %}
+      {{ campo("quantidade", "Quantidade *", v, erros, "number", 'min="1"') }}
+      {{ campo("motivo", "Motivo / Observação *", v, erros, extra='placeholder="Detalhe o motivo da operação"') }}
+    {% endif %}
+
+    <div style="grid-column: 1 / -1; padding-top:12px; border-top:1px solid var(--linha); display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+      <a href="/estoque" class="bmq-btn bmq-btn-secundario">Cancelar</a>
+      <button type="submit" class="bmq-btn bmq-btn-primario">
+        {{ icone("confirmado", 16) }} <span>Registrar</span>
+      </button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, badge_validade, pill_status_estoque, tile_produto, estado_vazio %}
+{% block titulo %}{{ produto.nome }}{% endblock %}
+{% block titulo_pagina %}Lotes do produto{% endblock %}
+{% block conteudo %}
+<div style="margin-bottom:16px;">
+  <a href="/estoque" style="color:var(--rosa); font-weight:700; font-size:13px;">← Voltar para posição de estoque</a>
+</div>
+
+<!-- Cabeçalho do Produto -->
+<section class="bmq-card" style="padding:20px 24px; margin-bottom:22px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
+  <div style="display:flex; align-items:center; gap:14px;">
+    {{ tile_produto(produto) }}
+    <div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <h2 style="font-size:20px; margin:0;">{{ produto.nome }}</h2>
+        {{ pill_status_estoque(saldo, produto.estoque_minimo) }}
+      </div>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:4px 0 0;">
+        SKU <strong style="font-family:monospace; color:var(--preto);">{{ produto.sku }}</strong>
+        · Marca <strong>{{ produto.marca.nome }}</strong>
+        · Saldo total <strong style="color:var(--preto);">{{ saldo }} un.</strong>
+        · Mínimo <strong>{{ produto.estoque_minimo }} un.</strong>
+      </p>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+    {% if usuario.perfil != Perfil.VENDEDOR %}
+      <a href="/estoque/movimentar/entrada?produto_id={{ produto.id }}" class="bmq-btn bmq-btn-primario">
+        {{ icone("entrada", 16) }} <span>+ Entrada de lote</span>
+      </a>
+    {% endif %}
+    <a href="/estoque/movimentar/venda?produto_id={{ produto.id }}" class="bmq-btn bmq-btn-secundario">
+      {{ icone("saida", 16) }} <span>Registrar venda</span>
+    </a>
+    {% if usuario.perfil != Perfil.VENDEDOR %}
+      <a href="/estoque/movimentar/ajuste?produto_id={{ produto.id }}" class="bmq-btn bmq-btn-fantasma">
+        {{ icone("ajuste", 16) }} <span>Ajustar lote</span>
+      </a>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Lotes (ordem FEFO) -->
+<section class="bmq-card" style="overflow:hidden; margin-bottom:24px;">
+  <div style="padding:16px 22px; border-bottom:1px solid var(--linha); display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <h3 style="font-size:17px; margin:0;">Lotes rastreados (ordem FEFO)</h3>
+      <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">O lote com vencimento mais próximo é sugerido e baixado primeiro</p>
+    </div>
+  </div>
+  <div class="bmq-table-wrap">
+    <table class="bmq-table">
+      <thead>
+        <tr>
+          <th>Lote</th>
+          <th>Validade</th>
+          <th>Situação</th>
+          <th style="text-align:right;">Custo unit.</th>
+          <th style="text-align:right;">Saldo no lote</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for l, s in lotes %}
+        <tr style="{{ 'opacity:0.5;' if s == 0 }}">
+          <td style="font-family:monospace; font-weight:700;">{{ l.numero_lote }}</td>
+          <td>{{ l.data_validade|data }}</td>
+          <td>{{ badge_validade(l.data_validade) if s > 0 else 'Esgotado' }}</td>
+          <td style="text-align:right;">{{ l.custo_unitario|brl }}</td>
+          <td style="text-align:right; font-weight:800;">{{ s }}</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="5">
+            {{ estado_vazio("Sem lotes cadastrados.", "Registre uma entrada de mercadoria para iniciar o saldo deste produto.", "+ Registrar entrada", "/estoque/movimentar/entrada?produto_id=" ~ produto.id if usuario.perfil != Perfil.VENDEDOR else None) }}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Últimas movimentações do produto -->
+<section class="bmq-card" style="overflow:hidden;">
+  <div style="padding:16px 22px; border-bottom:1px solid var(--linha);">
+    <h3 style="font-size:17px; margin:0;">Últimas movimentações deste produto</h3>
+  </div>
+  {% include "estoque/_tabela_movs.html" %}
+</section>
+{% endblock %}

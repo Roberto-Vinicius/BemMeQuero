@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone %}
+{% block titulo %}Relatórios{% endblock %}
+{% block titulo_pagina %}Central de relatórios e exportações{% endblock %}
+{% block conteudo %}
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
+  {% for slug, titulo in itens %}
+  <a href="/relatorios/{{ slug }}" class="bmq-card" style="padding:22px; display:flex; align-items:flex-start; justify-content:space-between; gap:14px; transition:transform 0.15s ease;">
+    <div>
+      <h2 style="font-size:17px; color:var(--preto); margin:0 0 6px;">{{ titulo }}</h2>
+      <p style="font-size:13px; color:var(--tinta-suave); margin:0;">Consultar na tela · Exportar em CSV, Planilha Excel (.xlsx) ou PDF</p>
+    </div>
+    <span class="bmq-kpi-bubble d-dourado">{{ icone("relatorios", 18) }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

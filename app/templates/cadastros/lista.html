@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icone, alerta, estado_vazio %}
+{% block titulo %}{{ rotulo }}s{% endblock %}
+{% block titulo_pagina %}Cadastro de {{ rotulo|lower }}s{% endblock %}
+{% block conteudo %}
+<div style="margin-bottom:16px;">
+  <a href="/produtos" style="color:var(--rosa); font-weight:700; font-size:13px;">← Voltar para produtos</a>
+</div>
+
+{{ alerta(erro) }}
+
+<section class="bmq-card" style="max-width:720px; overflow:hidden;">
+  <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="bmq-kpi-bubble d-dourado" style="width:34px; height:34px;">{{ icone("flor", 18) }}</span>
+      <div>
+        <h2 style="font-size:18px; margin:0;">{{ rotulo }}s da perfumaria</h2>
+        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Adicione, renomeie ou remova {{ rotulo|lower }}s sem produtos vinculados</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="/cadastros/{{ tipo }}" style="padding:16px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; gap:10px;">
+    <input name="nome" placeholder="Nova {{ rotulo|lower }}…" required class="bmq-input" style="flex:1;">
+    <button type="submit" class="bmq-btn bmq-btn-primario">
+      {{ icone("adicionar", 16) }} <span>Adicionar</span>
+    </button>
+  </form>
+
+  <div>
+    {% for i in itens %}
+    <div style="display:flex; align-items:center; gap:10px; padding:12px 22px; border-bottom:1px solid var(--linha);">
+      <form method="post" action="/cadastros/{{ tipo }}/{{ i.id }}/editar" style="display:flex; flex:1; gap:10px; align-items:center;">
+        <input name="nome" value="{{ i.nome }}" class="bmq-input" style="flex:1; height:34px;">
+        <button type="submit" class="bmq-btn bmq-btn-secundario" style="height:34px; font-size:12px;">Renomear</button>
+      </form>
+      <form method="post" action="/cadastros/{{ tipo }}/{{ i.id }}/excluir" onsubmit="return confirm('Excluir {{ i.nome|e }}?')">
+        <button type="submit" class="bmq-btn bmq-btn-fantasma" style="height:34px; font-size:12px; color:var(--erro-fg);">Excluir</button>
+      </form>
+    </div>
+    {% else %}
+    {{ estado_vazio("Nenhum registro cadastrado.", "Utilize o campo acima para cadastrar a primeira " ~ (rotulo|lower) ~ ".") }}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
