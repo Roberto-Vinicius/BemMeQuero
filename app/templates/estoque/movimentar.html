@@ -67,8 +67,7 @@
     {% endif %}
 
     {% if tipo == "entrada" %}
-      {{ campo("numero_lote", "Número do lote *", v, erros, extra='placeholder="Ex.: LOTE-2026-01"') }}
-      {{ campo("data_validade", "Data de validade *", v, erros, "date") }}
+      {{ campo("numero_lote", "Código da remessa / Lote (opcional)", v, erros, extra='placeholder="Ex.: NF-000005339"') }}
       {{ campo("quantidade", "Quantidade recebida *", v, erros, "number", 'min="1"') }}
       {{ campo("custo_unitario", "Custo unitário (R$) *", v, erros, extra='inputmode="decimal" placeholder="59,90"') }}
       <div>
@@ -84,9 +83,6 @@
     {% elif tipo == "venda" %}
       {{ campo("quantidade", "Quantidade de saída *", v, erros, "number", 'min="1"') }}
       {{ campo("preco_unitario", "Preço unitário praticado (R$) — vazio usa tabela", v, erros, extra='inputmode="decimal"') }}
-      <div style="grid-column: 1 / -1; padding:10px 14px; border-radius:var(--raio-md); background:var(--dourado-suave); color:var(--preto); font-size:12.5px;">
-        <strong>Regra FEFO ativa:</strong> O sistema baixa automaticamente o(s) lote(s) com validade mais próxima. Lotes vencidos são bloqueados.
-      </div>
     {% elif tipo == "ajuste" %}
       {{ campo("contagem_real", "Contagem física real do lote *", v, erros, "number", 'min="0"') }}
       {{ campo("motivo", "Motivo do ajuste de inventário *", v, erros, extra='placeholder="Ex.: Conferência de balanço mensal"') }}

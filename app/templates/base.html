@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Visão geral{% endblock %} · Bem Me Quero · Estoque</title>
-  <link rel="icon" type="image/svg+xml" href="/static/img/logo-flor.svg?v=5">
-  <link rel="stylesheet" href="/static/css/bemmequero.css?v=5">
+  <link rel="icon" type="image/svg+xml" href="/static/img/logo-flor.svg?v=7">
+  <link rel="stylesheet" href="/static/css/bemmequero.css?v=7">
   <script src="/static/js/htmx.min.js" defer></script>
   <script src="/static/js/alpine.min.js" defer></script>
   <script src="/static/js/chart.min.js" defer></script>
   <script src="/static/js/app.js" defer></script>
 </head>
-<body x-data="{ gavetaAberta: false, menuUsuario: false, menuAlertas: false, modalAberto: false, toasts: [] }"
+<body x-data="{ gavetaAberta: false, menuUsuario: false, menuAlertas: false, buscaMobile: false, modalAberto: false, toasts: [] }"
       @bmq-toast.window="toasts.push({ id: Date.now(), ...$event.detail }); setTimeout(() => toasts.shift(), 4000)"
-      @keydown.escape.window="gavetaAberta = false; menuUsuario = false; menuAlertas = false; modalAberto = false">
+      @keydown.escape.window="gavetaAberta = false; menuUsuario = false; menuAlertas = false; buscaMobile = false; modalAberto = false">
 
 {% include "_icons.html" %}
 {% from "_macros.html" import icone %}
@@ -44,7 +44,7 @@
             {{ icone("painel") }} <span>Dashboard</span>
           </a>
           <a href="/produtos" class="bmq-nav-item {{ 'ativo' if path.startswith('/produtos') }}">
-            {{ icone("perfume") }} <span>Produtos</span>
+            {{ icone("sacola") }} <span>Produtos</span>
           </a>
           <a href="/estoque" class="bmq-nav-item {{ 'ativo' if path == '/estoque' or path.startswith('/estoque/produto') }}">
             {{ icone("lotes") }} <span>Estoque</span>
@@ -135,6 +135,22 @@
                  class="bmq-search-input">
           <kbd class="bmq-search-kbd">/</kbd>
         </form>
+
+        <!-- Botão de pesquisa compacto (visível em telas menores sem quebrar linha) -->
+        <div class="bmq-search-mobile-only" style="position:relative; flex-shrink:0;">
+          <button type="button" class="bmq-bell-btn" @click="buscaMobile = !buscaMobile; if(buscaMobile) $nextTick(() => $refs.inputBuscaMobile.focus())" aria-label="Pesquisar">
+            {{ icone("buscar", 18) }}
+          </button>
+          <div x-cloak x-show="buscaMobile" @click.outside="buscaMobile = false"
+               class="bmq-card" style="position:absolute; right:0; top:44px; width:min(300px, calc(100vw - 28px)); padding:8px; z-index:55;">
+            <form action="{{ acao_busca }}" method="get" role="search" style="display:flex; gap:6px;">
+              <input x-ref="inputBuscaMobile" name="q" value="{{ q|default('') }}"
+                     placeholder="{{ placeholder_busca }}" aria-label="{{ placeholder_busca }}"
+                     class="bmq-search-input" style="padding:0 12px; height:36px;">
+              <button type="submit" class="bmq-btn bmq-btn-primario" style="height:36px; padding:0 12px;">Ir</button>
+            </form>
+          </div>
+        </div>
 
         <!-- Sino de alertas (T13) -->
         <div style="position:relative; flex-shrink:0;">

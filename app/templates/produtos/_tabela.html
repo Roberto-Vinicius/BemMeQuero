@@ -5,14 +5,14 @@
     <thead>
       <tr>
         <th>Produto</th>
-        <th>Marca</th>
-        <th>Categoria</th>
-        <th>Código (SKU)</th>
-        <th>Volume</th>
-        <th style="text-align:right;">Venda</th>
-        <th style="text-align:right;">Estoque</th>
-        <th style="text-align:right;">Mín.</th>
-        <th>Status</th>
+        <th class="bmq-hide-sm">Marca</th>
+        <th class="bmq-hide-md">Categoria</th>
+        <th class="bmq-hide-md">Código (SKU)</th>
+        <th class="bmq-hide-lg">Volume</th>
+        <th style="text-align:right;">Preço</th>
+        <th style="text-align:right;">Qtd.</th>
+        <th class="bmq-hide-lg" style="text-align:right;">Mín.</th>
+        <th class="bmq-hide-sm">Status</th>
         <th style="text-align:right;">Ações</th>
       </tr>
     </thead>
@@ -21,7 +21,7 @@
       {% set saldo_atual = mapa_saldos.get(p.id, 0) %}
       <tr style="{{ 'opacity:0.58;' if not p.ativo }}">
         <td>
-          <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
             {{ tile_produto(p) }}
             <div>
               <a href="{{ '/produtos/' ~ p.id ~ '/editar' if usuario.perfil != Perfil.VENDEDOR else '/estoque/produto/' ~ p.id }}"
@@ -31,37 +31,35 @@
               {% if not p.ativo %}
                 <span class="bmq-pill bmq-pill-neutro" style="margin-left:4px; font-size:10px;">inativo</span>
               {% endif %}
-              {% if p.tipo_perfumaria or p.familia_olfativa %}
-                <div style="font-size:11px; color:var(--tinta-suave);">
-                  {{ p.tipo_perfumaria or '' }}{{ ' · ' ~ p.familia_olfativa if p.familia_olfativa else '' }}
-                </div>
-              {% endif %}
+              <div style="font-size:11px; color:var(--tinta-suave);">
+                {{ p.categoria.nome }}{% if p.marca %} · {{ p.marca.nome }}{% endif %}
+              </div>
             </div>
           </div>
         </td>
-        <td style="font-weight:600;">{{ p.marca.nome }}</td>
-        <td>{{ p.categoria.nome }}</td>
-        <td style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
-        <td style="color:var(--tinta-suave);">
+        <td class="bmq-hide-sm" style="font-weight:600;">{{ p.marca.nome }}</td>
+        <td class="bmq-hide-md">{{ p.categoria.nome }}</td>
+        <td class="bmq-hide-md" style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
+        <td class="bmq-hide-lg" style="color:var(--tinta-suave);">
           {% if p.volume_valor %}{{ '%g'|format(p.volume_valor) }} {{ p.volume_unidade or '' }}{% else %}—{% endif %}
         </td>
-        <td style="text-align:right; font-weight:700;">{{ p.preco_venda|brl }}</td>
-        <td style="text-align:right; font-weight:800; color:{{ 'var(--erro-fg)' if saldo_atual < p.estoque_minimo else 'var(--preto)' }};">
+        <td style="text-align:right; font-weight:700; white-space:nowrap;">{{ p.preco_venda|brl }}</td>
+        <td style="text-align:right; font-weight:800; white-space:nowrap; color:{{ 'var(--erro-fg)' if saldo_atual < p.estoque_minimo else 'var(--preto)' }};">
           <a href="/estoque/produto/{{ p.id }}">{{ saldo_atual }} un.</a>
         </td>
-        <td style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
-        <td>
+        <td class="bmq-hide-lg" style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
+        <td class="bmq-hide-sm">
           {{ pill('Ativo' if p.ativo else 'Inativo', 'sucesso' if p.ativo else 'neutro') }}
         </td>
         <td style="text-align:right; white-space:nowrap;">
-          <a href="/estoque/produto/{{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;" title="Ver lotes">
+          <a href="/estoque/produto/{{ p.id }}" class="bmq-btn bmq-btn-fantasma bmq-hide-sm" style="height:28px; padding:0 8px; font-size:12px;" title="Ver lotes">
             Lotes
           </a>
           {% if usuario.perfil != Perfil.VENDEDOR %}
             <a href="/produtos/{{ p.id }}/editar" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px; color:var(--rosa);">
               Editar
             </a>
-            <form method="post" action="/produtos/{{ p.id }}/ativo" style="display:inline;">
+            <form method="post" action="/produtos/{{ p.id }}/ativo" class="bmq-hide-md" style="display:inline;">
               <button type="submit" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;">
                 {{ 'Inativar' if p.ativo else 'Reativar' }}
               </button>

@@ -45,7 +45,7 @@ def test_posicao_mostra_saldo_e_alerta_minimo(dados):
 def test_detalhe_produto_mostra_lote_e_validade(dados):
     db, p, u, _ = dados
     html = corpo(r.detalhe_produto(p.id, fake_request(), db, u))
-    assert "L1" in html and "≤ 30 dias" in html and "Venda" in html
+    assert "L1" in html and "Venda" in html
 
 
 def test_movimentacoes_e_filtros(dados):

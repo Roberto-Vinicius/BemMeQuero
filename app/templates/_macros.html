@@ -73,14 +73,20 @@
 {% endif %}
 {%- endmacro %}
 
-{# Tile de produto: 32px, cantos 6px; foto se houver, senão fundo dourado-suave com ícone #}
+{# Tile de produto: 32px, cantos 6px; foto se houver, senão fundo dourado-suave com ícone da categoria #}
 {% macro tile_produto(produto) -%}
 <span class="bmq-tile">
   {% if produto and produto.foto_path %}
     <img src="/static/{{ produto.foto_path }}" alt="{{ produto.nome }}">
   {% else %}
     {% set cat_nome = (produto.categoria.nome|lower) if (produto and produto.categoria) else '' %}
-    {% if 'perfum' in cat_nome or 'splash' in cat_nome or 'colôn' in cat_nome %}
+    {% if 'moda' in cat_nome or 'íntima' in cat_nome or 'intima' in cat_nome or 'fitness' in cat_nome or 'vestu' in cat_nome %}
+      {{ icone("roupa", 18) }}
+    {% elif 'kit' in cat_nome or 'presente' in cat_nome or 'estojo' in cat_nome %}
+      {{ icone("presente", 18) }}
+    {% elif 'catálogo' in cat_nome or 'catalogo' in cat_nome or 'apoio' in cat_nome %}
+      {{ icone("catalogo", 18) }}
+    {% elif 'perfum' in cat_nome or 'splash' in cat_nome or 'colôn' in cat_nome %}
       {{ icone("perfume", 18) }}
     {% else %}
       {{ icone("cosmeticos", 18) }}

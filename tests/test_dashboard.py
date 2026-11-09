@@ -123,5 +123,5 @@ def test_painel_renderiza(loja):
     entrada(a, "L1", 15, 4, "10")
     req = Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""})
     html = rota.painel(req, db, u).body.decode()
-    assert "Kaiak" in html and "R$ 40,00" in html and "Vencem em até 30 dias" in html
+    assert "Kaiak" in html and "R$ 40,00" in html and "Atividades recentes" in html
     assert "abaixo do estoque mínimo" in html

@@ -19,11 +19,11 @@
 <div class="bmq-kpi-grid" style="margin-bottom:24px;">
   {{ kpi_card("Total em estoque", ns.unidades ~ " un.", "lotes", "rosa", (linhas|length) ~ " produtos monitorados", "neutro") }}
   {{ kpi_card("Estoque baixo", ns.abaixo, "estoque-baixo", "erro", "Abaixo do estoque mínimo", "negativo" if ns.abaixo > 0 else "positivo") }}
-  {{ kpi_card("Fora de estoque", ns.zerados, "alertas", "dourado", "Produtos com saldo zero", "negativo" if ns.zerados > 0 else "positivo") }}
+  {{ kpi_card("Fora de estoque", ns.zerados, "sem-estoque", "dourado", "Produtos com saldo zero", "negativo" if ns.zerados > 0 else "positivo") }}
   {% if usuario.perfil == Perfil.ADMIN %}
-    {{ kpi_card("Valor em estoque", ns.valor|brl, "preco", "sucesso", "Calculado a preço de custo", "positivo") }}
+    {{ kpi_card("Valor em estoque", ns.valor|brl, "dinheiro", "sucesso", "Calculado a preço de custo", "positivo") }}
   {% else %}
-    {{ kpi_card("Produtos ativos", linhas|length, "perfume", "sucesso", "Itens disponíveis no catálogo", "positivo") }}
+    {{ kpi_card("Produtos ativos", linhas|length, "sacola", "sucesso", "Itens disponíveis no catálogo", "positivo") }}
   {% endif %}
 </div>
 
@@ -31,8 +31,8 @@
 <section class="bmq-card" style="overflow:hidden;">
   <div style="padding:18px 22px; border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
     <div>
-      <h2 style="font-size:18px; margin:0;">Posição de estoque e lotes</h2>
-      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Controle FEFO (primeiro que vence, primeiro que sai) e níveis de reposição</p>
+      <h2 style="font-size:18px; margin:0;">Posição de estoque</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Controle de saldo, custos e níveis de reposição por produto</p>
     </div>
 
     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
@@ -72,13 +72,13 @@
       <thead>
         <tr>
           <th>Produto</th>
-          <th>Marca</th>
-          <th>Código (SKU)</th>
-          <th style="text-align:right;">Valor compra</th>
-          <th style="text-align:right;">Valor unit.</th>
-          <th>Estoque total</th>
-          <th style="text-align:right;">Mínimo</th>
-          <th>Status</th>
+          <th class="bmq-hide-sm">Marca</th>
+          <th class="bmq-hide-md">Código (SKU)</th>
+          <th class="bmq-hide-md" style="text-align:right;">Valor compra</th>
+          <th style="text-align:right;">Preço</th>
+          <th>Qtd.</th>
+          <th class="bmq-hide-lg" style="text-align:right;">Mínimo</th>
+          <th class="bmq-hide-sm">Status</th>
           <th style="text-align:right;">Ações</th>
         </tr>
       </thead>
@@ -88,7 +88,7 @@
         {% set pct_clamp = 100 if pct > 100 else (6 if pct < 6 and saldo > 0 else pct) %}
         <tr>
           <td>
-            <a href="/estoque/produto/{{ p.id }}" style="display:flex; align-items:center; gap:10px;">
+            <a href="/estoque/produto/{{ p.id }}" style="display:flex; align-items:center; gap:8px;">
               {{ tile_produto(p) }}
               <div>
                 <div style="font-weight:700; color:var(--preto);">{{ p.nome }}</div>
@@ -96,21 +96,21 @@
               </div>
             </a>
           </td>
-          <td style="font-weight:600;">{{ p.marca.nome }}</td>
-          <td style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
-          <td style="text-align:right; color:var(--tinta-suave);">{{ p.preco_custo|brl }}</td>
-          <td style="text-align:right; font-weight:700;">{{ p.preco_venda|brl }}</td>
+          <td class="bmq-hide-sm" style="font-weight:600;">{{ p.marca.nome }}</td>
+          <td class="bmq-hide-md" style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
+          <td class="bmq-hide-md" style="text-align:right; color:var(--tinta-suave);">{{ p.preco_custo|brl }}</td>
+          <td style="text-align:right; font-weight:700; white-space:nowrap;">{{ p.preco_venda|brl }}</td>
           <td>
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div class="bmq-progress" style="width:76px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="bmq-progress bmq-hide-sm" style="width:76px;">
                 <div class="bmq-progress-bar" style="width:{{ pct_clamp }}%; background:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--sucesso-fg)' }};"></div>
               </div>
               <strong style="font-weight:800; color:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--preto)' }};">{{ saldo }}</strong>
               <span style="font-size:11.5px; color:var(--tinta-suave);">un.</span>
             </div>
           </td>
-          <td style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
-          <td>
+          <td class="bmq-hide-lg" style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
+          <td class="bmq-hide-sm">
             {{ pill_status_estoque(saldo, p.estoque_minimo) }}
             {% if saldo < p.estoque_minimo %}
               <span class="bmq-pill bmq-pill-erro" style="margin-left:4px; font-size:10.5px;">Abaixo do mínimo</span>
@@ -121,7 +121,7 @@
               Ver lotes
             </a>
             {% if usuario.perfil != Perfil.VENDEDOR %}
-              <a href="/estoque/movimentar/entrada?produto_id={{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px;">
+              <a href="/estoque/movimentar/entrada?produto_id={{ p.id }}" class="bmq-btn bmq-btn-fantasma bmq-hide-sm" style="height:28px; padding:0 8px; font-size:12px;">
                 + Entrada
               </a>
             {% endif %}

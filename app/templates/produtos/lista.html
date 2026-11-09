@@ -8,10 +8,10 @@
 <div x-data="{ modalImportar: false }">
   <!-- 4 KPIs de Produtos (T04 - s04.png) -->
   <div class="bmq-kpi-grid" style="margin-bottom:24px;">
-    {{ kpi_card("Total de produtos", k.total, "perfume", "rosa", "Itens cadastrados no catálogo", "neutro") }}
+    {{ kpi_card("Total de produtos", k.total, "sacola", "rosa", "Itens cadastrados no catálogo", "neutro") }}
     {{ kpi_card("Produtos ativos", k.ativos, "confirmado", "sucesso", "Disponíveis para operação", "positivo") }}
     {{ kpi_card("Produtos inativos", k.inativos, "relogio", "dourado", "Itens arquivados", "neutro") }}
-    {{ kpi_card("Fora de estoque", k.sem_estoque, "estoque-baixo", "erro", "Ativos com saldo zerado", "negativo" if k.sem_estoque > 0 else "positivo") }}
+    {{ kpi_card("Fora de estoque", k.sem_estoque, "sem-estoque", "erro", "Ativos com saldo zerado", "negativo" if k.sem_estoque > 0 else "positivo") }}
   </div>
 
   {% if request and request.query_params.get('importados') %}

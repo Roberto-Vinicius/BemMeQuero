@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.produto import Dinheiro
 
@@ -13,12 +13,26 @@ CAMPOS_DECIMAIS_ESTOQUE = {"custo_unitario", "preco_unitario"}
 
 class EntradaIn(BaseModel):
     produto_id: int
-    numero_lote: Annotated[str, Field(min_length=1, max_length=60)]
-    data_validade: date
+    numero_lote: Annotated[str, Field(min_length=1, max_length=60)] = "PADRAO"
+    data_validade: date = Field(default_factory=lambda: date.today() + timedelta(days=730))
     quantidade: Quantidade
     custo_unitario: Dinheiro
     fornecedor_id: int | None = None
     motivo: Annotated[str | None, Field(max_length=500)] = None
+
+    @field_validator("data_validade", mode="before")
+    @classmethod
+    def _default_validade(cls, v):
+        if v is None or str(v).strip() == "":
+            return date.today() + timedelta(days=730)
+        return v
+
+    @field_validator("numero_lote", mode="before")
+    @classmethod
+    def _default_lote(cls, v):
+        if v is None or str(v).strip() == "":
+            return f"LOTE-{date.today().strftime('%Y%m%d')}"
+        return v
 
 
 class VendaIn(BaseModel):

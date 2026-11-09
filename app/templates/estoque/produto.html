@@ -42,38 +42,34 @@
   </div>
 </section>
 
-<!-- Lotes (ordem FEFO) -->
+<!-- Lotes -->
 <section class="bmq-card" style="overflow:hidden; margin-bottom:24px;">
   <div style="padding:16px 22px; border-bottom:1px solid var(--linha); display:flex; align-items:center; justify-content:space-between;">
     <div>
-      <h3 style="font-size:17px; margin:0;">Lotes rastreados (ordem FEFO)</h3>
-      <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">O lote com vencimento mais próximo é sugerido e baixado primeiro</p>
+      <h3 style="font-size:17px; margin:0;">Remessas / Lotes em estoque</h3>
+      <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Histórico de entradas e saldo disponível por remessa</p>
     </div>
   </div>
   <div class="bmq-table-wrap">
     <table class="bmq-table">
       <thead>
         <tr>
-          <th>Lote</th>
-          <th>Validade</th>
-          <th>Situação</th>
+          <th>Lote / Nota Fiscal</th>
           <th style="text-align:right;">Custo unit.</th>
-          <th style="text-align:right;">Saldo no lote</th>
+          <th style="text-align:right;">Saldo disponível</th>
         </tr>
       </thead>
       <tbody>
       {% for l, s in lotes %}
         <tr style="{{ 'opacity:0.5;' if s == 0 }}">
           <td style="font-family:monospace; font-weight:700;">{{ l.numero_lote }}</td>
-          <td>{{ l.data_validade|data }}</td>
-          <td>{{ badge_validade(l.data_validade) if s > 0 else 'Esgotado' }}</td>
           <td style="text-align:right;">{{ l.custo_unitario|brl }}</td>
-          <td style="text-align:right; font-weight:800;">{{ s }}</td>
+          <td style="text-align:right; font-weight:800;">{{ s }} un.</td>
         </tr>
       {% else %}
         <tr>
-          <td colspan="5">
-            {{ estado_vazio("Sem lotes cadastrados.", "Registre uma entrada de mercadoria para iniciar o saldo deste produto.", "+ Registrar entrada", "/estoque/movimentar/entrada?produto_id=" ~ produto.id if usuario.perfil != Perfil.VENDEDOR else None) }}
+          <td colspan="3">
+            {{ estado_vazio("Sem entradas cadastradas.", "Registre uma entrada de mercadoria para iniciar o saldo deste produto.", "+ Registrar entrada", "/estoque/movimentar/entrada?produto_id=" ~ produto.id if usuario.perfil != Perfil.VENDEDOR else None) }}
           </td>
         </tr>
       {% endfor %}
