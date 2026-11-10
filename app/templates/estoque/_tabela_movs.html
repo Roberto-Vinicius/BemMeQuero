@@ -5,32 +5,39 @@
   <table class="bmq-table">
     <thead>
       <tr>
-        <th class="bmq-hide-sm">Data / Hora</th>
-        <th>Tipo</th>
         <th>Produto</th>
+        <th>Tipo</th>
+        <th class="num">Qtd.</th>
+        <th class="num bmq-hide-sm">Valor</th>
         <th class="bmq-hide-md">Lote</th>
-        <th style="text-align:right;">Qtd.</th>
         <th class="bmq-hide-lg">Motivo / Nota</th>
-        <th class="bmq-hide-sm">Usuário</th>
+        <th class="bmq-hide-sm">Data · Usuário</th>
       </tr>
     </thead>
     <tbody>
     {% for m in movs %}
       <tr>
-        <td class="bmq-hide-sm" style="white-space:nowrap; font-size:12.5px; color:var(--tinta-suave);">{{ m.criado_em|datahora }}</td>
-        <td>{{ pill(rotulos[m.tipo.value], cores_tipo[m.tipo.value]) }}</td>
-        <td>
-          <div style="display:flex; align-items:center; gap:8px;">
+        <td class="col-produto">
+          <a class="bmq-prod-cell" href="/estoque/produto/{{ m.produto_id }}" title="{{ m.produto.nome }}">
             {{ tile_produto(m.produto) }}
-            <span style="font-weight:700; color:var(--preto);">{{ m.produto.nome }}</span>
-          </div>
+            <div>
+              <div class="bmq-prod-nome">{{ m.produto.nome }}</div>
+            </div>
+          </a>
         </td>
-        <td class="bmq-hide-md" style="font-family:monospace; font-size:12px;">{{ m.lote.numero_lote }}</td>
-        <td style="text-align:right; font-weight:800; white-space:nowrap; color:{{ 'var(--sucesso-fg)' if m.sinal > 0 else 'var(--erro-fg)' }};">
-          {{ '+' if m.sinal > 0 else '−' }}{{ m.quantidade }}
+        <td>{{ pill(rotulos[m.tipo.value], cores_tipo[m.tipo.value]) }}</td>
+        <td class="num">
+          <span class="bmq-qtd" style="color:{{ 'var(--sucesso-fg)' if m.sinal > 0 else 'var(--erro-fg)' }};">{{ '+' if m.sinal > 0 else '−' }}{{ m.quantidade }}</span>
         </td>
-        <td class="bmq-hide-lg" style="color:var(--tinta-suave);">{{ m.motivo or '—' }}</td>
-        <td class="bmq-hide-sm" style="font-weight:600;">{{ m.usuario.nome }}</td>
+        <td class="num bmq-hide-sm" style="color:var(--tinta-suave);">
+          {% if m.preco_unitario is not none %}{{ (m.preco_unitario * m.quantidade)|brl }}{% else %}—{% endif %}
+        </td>
+        <td class="bmq-hide-md" style="font-family:monospace; font-size:12px; white-space:nowrap;">{{ m.lote.numero_lote }}</td>
+        <td class="bmq-hide-lg" style="color:var(--tinta-suave); max-width:240px;">{{ m.motivo or '—' }}</td>
+        <td class="bmq-hide-sm" style="white-space:nowrap;">
+          <div style="font-size:12.5px;">{{ m.criado_em|datahora }}</div>
+          <div style="font-size:11px; color:var(--tinta-suave);">{{ m.usuario.nome if m.usuario else 'Sistema' }}</div>
+        </td>
       </tr>
     {% else %}
       <tr>

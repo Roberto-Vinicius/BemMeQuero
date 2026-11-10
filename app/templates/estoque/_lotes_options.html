@@ -1,5 +1,5 @@
 <option value="">Selecione o lote…</option>
 {% for l, s in lotes %}
-  <option value="{{ l.id }}" {{ 'selected' if v.lote_id|string == l.id|string }}>Lote {{ l.numero_lote }} · val. {{ l.data_validade|data }} · saldo {{ s }}</option>
+  <option value="{{ l.id }}" {{ 'selected' if v.lote_id|string == l.id|string }}>Lote {{ l.numero_lote }} · custo {{ l.custo_unitario|brl }} · saldo {{ s }} un.</option>
 {% endfor %}
 

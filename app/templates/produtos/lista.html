@@ -5,7 +5,23 @@
 {% block conteudo %}
 {% set k = kpis|default({'total': produtos|length, 'ativos': produtos|selectattr('ativo')|list|length, 'inativos': 0, 'sem_estoque': 0}) %}
 
-<div x-data="{ modalImportar: false }">
+<div data-q="{{ q or '' }}" x-data="{
+  modalImportar: false,
+  fq: $el.dataset.q || '',
+  fCat: '{{ categoria_id or '' }}',
+  fMarca: '{{ marca_id or '' }}',
+  fEstoque: {{ 'true' if em_estoque else 'false' }},
+  urlVitrine(baixar = false) {
+    const p = new URLSearchParams();
+    if (this.fq && this.fq.trim()) p.set('q', this.fq.trim());
+    if (this.fCat) p.set('categoria_id', this.fCat);
+    if (this.fMarca) p.set('marca_id', this.fMarca);
+    if (this.fEstoque) p.set('em_estoque', 'true');
+    if (baixar) p.set('baixar', 'true');
+    const qs = p.toString();
+    return '/produtos/vitrine.pdf' + (qs ? '?' + qs : '');
+  }
+}">
   <!-- 4 KPIs de Produtos (T04 - s04.png) -->
   <div class="bmq-kpi-grid" style="margin-bottom:24px;">
     {{ kpi_card("Total de produtos", k.total, "sacola", "rosa", "Itens cadastrados no catálogo", "neutro") }}
@@ -21,6 +37,9 @@
     ({{ request.query_params.get('criados', '0') }} novo(s) no catálogo) e
     <strong>+{{ request.query_params.get('unidades', '0') }} un.</strong> adicionadas automaticamente ao estoque!
   </div>
+  {% endif %}
+  {% if request and request.query_params.get('salvo') %}
+  <div class="bmq-alerta-ok">Produto salvo com sucesso.</div>
   {% endif %}
   {% if request and request.query_params.get('erro_importacao') %}
   <div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:12px 16px; margin-bottom:16px; font-size:13px; font-weight:700;">
@@ -43,38 +62,58 @@
             {{ icone("upload", 16) }} <span>Importar Pedido / NF-e</span>
           </button>
         {% endif %}
-        <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
-          {{ icone("exportar", 16) }} <span>Exportar</span>
+        <a :href="urlVitrine(false)" target="_blank" rel="noopener" class="bmq-btn bmq-btn-secundario"
+           title="Abre uma vitrine em PDF (com nome, foto e preço) usando os filtros abaixo para enviar no WhatsApp">
+          {{ icone("catalogo", 16) }} <span>Catálogo PDF (Clientes)</span>
         </a>
         {% if usuario.perfil != Perfil.VENDEDOR %}
+          <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
+            {{ icone("exportar", 16) }} <span>Exportar</span>
+          </a>
           <a href="/produtos/novo" class="bmq-btn bmq-btn-primario">
             {{ icone("adicionar", 16) }} <span>Adicionar produto</span>
+          </a>
+        {% else %}
+          <a :href="urlVitrine(true)" class="bmq-btn bmq-btn-primario">
+            {{ icone("exportar", 16) }} <span>Baixar Vitrine PDF</span>
           </a>
         {% endif %}
       </div>
     </div>
 
     <!-- Barra de filtros acima da tabela (T04) -->
-    <form style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; gap:12px;"
+    <form style="padding:14px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; flex-wrap:wrap; align-items:center; gap:10px;"
           hx-get="/produtos" hx-target="#tabela" hx-trigger="input delay:300ms from:#q, change">
-      <div style="position:relative; flex:1; min-width:240px;">
+      <div style="position:relative; flex:1; min-width:210px;">
         <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--tinta-suave);">
           {{ icone("buscar", 16) }}
         </span>
-        <input id="q" name="q" value="{{ q }}" placeholder="Buscar por nome, marca, SKU ou código de barras…"
+        <input id="q" name="q" value="{{ q }}" x-model="fq" placeholder="Buscar por nome, marca, SKU ou código de barras…"
                class="bmq-input" style="padding-left:34px;">
       </div>
 
-      <select name="categoria_id" class="bmq-select" style="width:auto; min-width:190px;" aria-label="Filtrar por categoria">
+      <select name="categoria_id" x-model="fCat" class="bmq-select" style="width:auto; min-width:170px;" aria-label="Filtrar por categoria">
         <option value="">Todas as categorias</option>
         {% for c in categorias %}
           <option value="{{ c.id }}" {{ 'selected' if categoria_id == c.id }}>{{ c.nome }}</option>
         {% endfor %}
       </select>
 
-      <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--tinta-suave); cursor:pointer; padding:0 6px;">
+      <select name="marca_id" x-model="fMarca" class="bmq-select" style="width:auto; min-width:160px;" aria-label="Filtrar por marca">
+        <option value="">Todas as marcas</option>
+        {% for m in marcas %}
+          <option value="{{ m.id }}" {{ 'selected' if marca_id == m.id }}>{{ m.nome }}</option>
+        {% endfor %}
+      </select>
+
+      <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--tinta); cursor:pointer; padding:0 4px;">
+        <input type="checkbox" name="em_estoque" value="true" x-model="fEstoque" {{ 'checked' if em_estoque }} style="accent-color:var(--rosa);">
+        <span>Pronta entrega</span>
+      </label>
+
+      <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--tinta-suave); cursor:pointer; padding:0 4px;">
         <input type="checkbox" name="inativos" value="true" {{ 'checked' if inativos }} style="accent-color:var(--rosa);">
-        <span>Mostrar inativos</span>
+        <span>Inativos</span>
       </label>
     </form>
 
@@ -94,7 +133,7 @@
           {{ icone("fechar", 15) }}
         </button>
       </div>
-      <form method="post" action="/produtos/importar" enctype="multipart/form-data">
+      <form method="post" novalidate action="/produtos/importar" enctype="multipart/form-data">
         <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
           <label for="input_planilha_prod" class="bmq-dropzone">
             <span class="bmq-kpi-bubble d-dourado" style="width:48px; height:48px;">
@@ -106,7 +145,7 @@
             <div style="font-size:12px; color:var(--tinta-suave);">
               Aceita: <strong>.PDF (DANFE / Pedido)</strong>, <strong>.XML (NF-e)</strong>, <strong>.XLSX</strong> ou <strong>.CSV</strong>
             </div>
-            <input id="input_planilha_prod" name="arquivo" type="file" accept=".pdf,.xml,.csv,.xlsx" required style="display:none;"
+            <input id="input_planilha_prod" name="arquivo" type="file" accept=".pdf,.xml,.csv,.xlsx" style="display:none;"
                    @change="if ($event.target.files.length) { nomeArquivo = $event.target.files[0].name; estadoUpload = 'enviando'; setTimeout(() => estadoUpload = 'concluido', 350); }">
           </label>
 
@@ -138,7 +177,7 @@
           </div>
         </div>
         <div class="bmq-modal-footer">
-          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;" :disabled="!nomeArquivo">
+          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;">
             Importar
           </button>
         </div>

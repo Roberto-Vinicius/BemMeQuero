@@ -46,11 +46,11 @@
       </div>
       {% endif %}
 
-      <form method="post" action="/primeiro-acesso" style="display:flex; flex-direction:column; gap:12px;">
+      <form method="post" novalidate action="/primeiro-acesso" style="display:flex; flex-direction:column; gap:12px;">
         <div class="bmq-grid-form-2">
           <div>
             <label class="bmq-label" for="nome">Nome *</label>
-            <input id="nome" name="nome" required value="{{ nome|default('') }}" placeholder="Maria" class="bmq-input">
+            <input id="nome" name="nome" value="{{ nome|default('') }}" placeholder="Maria" class="bmq-input">
           </div>
           <div>
             <label class="bmq-label" for="sobrenome">Sobrenome</label>
@@ -60,13 +60,13 @@
 
         <div>
           <label class="bmq-label" for="email">E-mail *</label>
-          <input id="email" name="email" type="email" required value="{{ email|default('') }}" placeholder="admin@bemmequero.com.br" class="bmq-input">
+          <input id="email" name="email" type="text" value="{{ email|default('') }}" placeholder="admin@bemmequero.com.br" class="bmq-input">
         </div>
 
         <div>
           <label class="bmq-label" for="senha">Senha *</label>
           <div style="position:relative;">
-            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha" required minlength="8"
+            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha"
                    placeholder="Crie uma senha forte" class="bmq-input" style="padding-right:38px;">
             <button type="button" @click="mostrarSenha = !mostrarSenha"
                     style="position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--tinta-suave); cursor:pointer;">
@@ -95,12 +95,12 @@
 
         <div>
           <label class="bmq-label" for="confirmacao">Confirmação de senha *</label>
-          <input id="confirmacao" name="confirmacao" :type="mostrarSenha ? 'text' : 'password'" x-model="confirmacao" required minlength="8"
+          <input id="confirmacao" name="confirmacao" :type="mostrarSenha ? 'text' : 'password'" x-model="confirmacao"
                  placeholder="Repita a senha" class="bmq-input">
         </div>
 
         <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:var(--tinta-suave); cursor:pointer; margin-top:2px;">
-          <input type="checkbox" name="termos" value="on" required checked style="accent-color:var(--rosa); margin-top:2px;">
+          <input type="checkbox" name="termos" value="on" checked style="accent-color:var(--rosa); margin-top:2px;">
           <span>Concordo com os <strong>Termos de Serviço</strong> e a <strong>Política de Privacidade</strong> da Bem Me Quero Perfumaria.</span>
         </label>
 

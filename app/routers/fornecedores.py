@@ -13,7 +13,7 @@ from app.core.templates import templates
 from app.models import Fornecedor, Lote, Usuario
 from app.schemas.comum import erros_pydantic, normalizar_form
 from app.schemas.fornecedor import CAMPOS_DECIMAIS_FORNECEDOR, FornecedorIn
-from app.services import cadastro_service
+from app.services import cadastro_service, importacao_pedido_service
 
 router = APIRouter(prefix="/fornecedores", tags=["fornecedores"])
 
@@ -153,11 +153,26 @@ def baixar_modelo_fornecedores(usuario: Usuario = Depends(require_role(*GESTAO))
 
 @router.post("/importar")
 async def importar_fornecedores(
-    arquivo: UploadFile = File(...),
+    arquivo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_role(*GESTAO)),
 ):
+    if not arquivo or not getattr(arquivo, "filename", None):
+        return RedirectResponse("/fornecedores?erro_importacao=Selecione+um+arquivo+para+importar.", status_code=303)
     raw = await arquivo.read()
+    nome_arq = (arquivo.filename or "").lower()
+    if nome_arq.endswith((".pdf", ".xml")):
+        try:
+            res = importacao_pedido_service.importar_arquivo_pedido(
+                db, usuario.id, arquivo.filename or "pedido.pdf", raw, registrar_estoque=True
+            )
+            return RedirectResponse(
+                f"/fornecedores?importados=1&fornecedor={res.fornecedor_nome}&nf={res.numero_nf}&itens={res.produtos_criados + res.produtos_atualizados}",
+                status_code=303,
+            )
+        except RegraDeNegocioError as e:
+            return RedirectResponse(f"/fornecedores?erro_importacao={e.mensagem}", status_code=303)
+
     texto = raw.decode("utf-8-sig", errors="replace")
     delim = ";" if ";" in texto.splitlines()[0] else ","
     leitor = csv.DictReader(io.StringIO(texto), delimiter=delim)

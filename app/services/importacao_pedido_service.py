@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.documentos import cnpj_valido, cpf_valido, somente_digitos
 from app.core.exceptions import RegraDeNegocioError
 from app.models import Categoria, Fornecedor, Lote, Marca, Movimentacao, Produto, TipoMovimentacao
@@ -299,14 +300,15 @@ def extrair_pedido_de_pdf(conteudo: bytes) -> PedidoExtraido:
             c1 = _dec(c1_raw, "0.00")
             c2 = _dec(c2_raw, "0.00")
 
+            margem = Decimal(str(get_settings().margem_lucro_padrao))
             # Caso 1: DANFE com colunas VALOR DESCONTO (c1) e VALOR LÍQUIDO (c2)
             if c2 > 0 and abs((Decimal(qtd) * v_unit - c1) - c2) <= Decimal("0.05"):
                 custo_unit = (c2 / Decimal(qtd)).quantize(Decimal("0.01"))
-                venda_unit = v_unit.quantize(Decimal("0.01")) if v_unit > custo_unit else (custo_unit * Decimal("1.35")).quantize(Decimal("0.01"))
+                venda_unit = v_unit.quantize(Decimal("0.01")) if v_unit > custo_unit else (custo_unit * margem).quantize(Decimal("0.01"))
             else:
                 # Caso 2: DANFE padrão onde c1 é VALOR TOTAL (qtd * v_unit)
                 custo_unit = v_unit.quantize(Decimal("0.01"))
-                venda_unit = (custo_unit * Decimal("1.35")).quantize(Decimal("0.01"))
+                venda_unit = (custo_unit * margem).quantize(Decimal("0.01"))
 
             marca_nome = inferir_marca(pedido.fornecedor_nome, descricao)
             cat_nome = inferir_categoria_por_descricao(descricao, ncm_cand)
@@ -501,8 +503,9 @@ def importar_arquivo_pedido(
         fornecedor_nome=fornecedor.nome if fornecedor else (pedido.fornecedor_nome or "Direto"),
     )
 
+    cfg = get_settings()
     lote_padrao = f"NF-{somente_digitos(pedido.numero_nf)}" if somente_digitos(pedido.numero_nf) else f"PED-{date.today().strftime('%Y%m%d')}"
-    validade_padrao = (pedido.data_emissao or date.today()) + timedelta(days=730)
+    validade_padrao = (pedido.data_emissao or date.today()) + timedelta(days=cfg.validade_padrao_dias)
 
     for item in pedido.itens:
         # Localiza ou cria Marca (comparação case-insensitive em Python para suportar acentos no SQLite)
@@ -542,11 +545,11 @@ def importar_arquivo_pedido(
                     fornecedor_id=fornecedor.id if fornecedor else None,
                     sku=item.sku[:50],
                     codigo_barras=item.codigo_barras,
-                    volume=vol_num,
+                    volume_valor=vol_num,
                     volume_unidade=vol_unid,
                     preco_custo=item.preco_custo,
                     preco_venda=item.preco_venda,
-                    estoque_minimo=2,
+                    estoque_minimo=cfg.estoque_minimo_padrao,
                     ativo=True,
                 ),
             )

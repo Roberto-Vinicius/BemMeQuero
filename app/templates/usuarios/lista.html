@@ -113,12 +113,12 @@
           {{ icone("fechar", 15) }}
         </button>
       </div>
-      <form method="post" action="/usuarios">
+      <form method="post" novalidate action="/usuarios">
         <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
           <div class="bmq-grid-form-2">
             <div>
               <label class="bmq-label" for="u_nome">Nome *</label>
-              <input id="u_nome" name="nome" required placeholder="Ex.: Maria" class="bmq-input">
+              <input id="u_nome" name="nome" placeholder="Ex.: Maria" class="bmq-input">
             </div>
             <div>
               <label class="bmq-label" for="u_sobrenome">Sobrenome</label>
@@ -129,7 +129,7 @@
           <div class="bmq-grid-form-2">
             <div>
               <label class="bmq-label" for="u_email">E-mail *</label>
-              <input id="u_email" name="email" type="email" required placeholder="maria@bemmequero.local" class="bmq-input">
+              <input id="u_email" name="email" type="text" placeholder="maria@bemmequero.local" class="bmq-input">
             </div>
             <div>
               <label class="bmq-label" for="u_perfil">Perfil de acesso *</label>
@@ -144,7 +144,7 @@
           <div>
             <label class="bmq-label" for="u_senha">Senha inicial (mín. 8 caracteres) *</label>
             <div style="position:relative;">
-              <input id="u_senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha" required minlength="8"
+              <input id="u_senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" x-model="senha"
                      placeholder="Digite a senha inicial" class="bmq-input" style="padding-right:38px;">
               <button type="button" @click="mostrarSenha = !mostrarSenha"
                       style="position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--tinta-suave); cursor:pointer;">

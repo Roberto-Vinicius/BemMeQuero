@@ -6,7 +6,11 @@ from app.models.catalogo import Marca
 
 
 def listar(
-    db: Session, q: str | None = None, categoria_id: int | None = None, incluir_inativos: bool = False
+    db: Session,
+    q: str | None = None,
+    categoria_id: int | None = None,
+    incluir_inativos: bool = False,
+    marca_id: int | None = None,
 ) -> list[Produto]:
     stmt = (
         select(Produto)
@@ -26,6 +30,8 @@ def listar(
         )
     if categoria_id:
         stmt = stmt.where(Produto.categoria_id == categoria_id)
+    if marca_id:
+        stmt = stmt.where(Produto.marca_id == marca_id)
     if not incluir_inativos:
         stmt = stmt.where(Produto.ativo.is_(True))
     return list(db.scalars(stmt).unique())

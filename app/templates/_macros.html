@@ -74,10 +74,10 @@
 {%- endmacro %}
 
 {# Tile de produto: 32px, cantos 6px; foto se houver, senão fundo dourado-suave com ícone da categoria #}
-{% macro tile_produto(produto) -%}
-<span class="bmq-tile">
+{% macro tile_produto(produto, classe="") -%}
+<span class="bmq-tile {{ classe }}">
   {% if produto and produto.foto_path %}
-    <img src="/static/{{ produto.foto_path }}" alt="{{ produto.nome }}">
+    <img src="/static/{{ produto.foto_path }}" alt="{{ produto.nome }}" loading="lazy">
   {% else %}
     {% set cat_nome = (produto.categoria.nome|lower) if (produto and produto.categoria) else '' %}
     {% if 'moda' in cat_nome or 'íntima' in cat_nome or 'intima' in cat_nome or 'fitness' in cat_nome or 'vestu' in cat_nome %}

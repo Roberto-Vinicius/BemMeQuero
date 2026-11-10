@@ -16,7 +16,16 @@
 
   {% if request and request.query_params.get('importados') %}
   <div class="bmq-pill-sucesso" style="border-radius:var(--raio-md); padding:10px 14px; margin-bottom:16px; font-size:13px; font-weight:700;">
-    Planilha processada com sucesso: {{ request.query_params.get('importados') }} fornecedor(es) importado(s).
+    {% if request.query_params.get('fornecedor') %}
+      Fornecedor <strong>{{ request.query_params.get('fornecedor') }}</strong> (NF {{ request.query_params.get('nf', '') }}) cadastrado/atualizado automaticamente com {{ request.query_params.get('itens', '0') }} produto(s)!
+    {% else %}
+      Planilha processada com sucesso: {{ request.query_params.get('importados') }} fornecedor(es) importado(s).
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if request and request.query_params.get('erro_importacao') %}
+  <div class="bmq-pill-erro" style="border-radius:var(--raio-md); padding:10px 14px; margin-bottom:16px; font-size:13px; font-weight:700;">
+    {{ request.query_params.get('erro_importacao') }}
   </div>
   {% endif %}
 
@@ -63,24 +72,24 @@
     <div class="bmq-modal" style="max-width:520px;">
       <div class="bmq-modal-header">
         <div>
-          <h2 class="bmq-modal-title">Importar planilha - Fornecedores</h2>
-          <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Cadastre múltiplos fornecedores via arquivo CSV ou Excel</p>
+          <h2 class="bmq-modal-title">Importar Fornecedor / DANFE (PDF, XML ou Planilha)</h2>
+          <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Envie o PDF da Nota Fiscal (DANFE), XML ou planilha (.csv/.xlsx) para cadastrar automaticamente o fornecedor e seus produtos</p>
         </div>
         <button type="button" class="bmq-modal-close" @click="modalImportar = false" aria-label="Fechar">
           {{ icone("fechar", 15) }}
         </button>
       </div>
-      <form method="post" action="/fornecedores/importar" enctype="multipart/form-data">
+      <form method="post" novalidate action="/fornecedores/importar" enctype="multipart/form-data">
         <div class="bmq-modal-body" style="display:flex; flex-direction:column; gap:14px;">
           <label for="input_planilha_forn" class="bmq-dropzone">
             <span class="bmq-kpi-bubble d-dourado" style="width:48px; height:48px;">
               {{ icone("planilha", 24) }}
             </span>
             <div style="font-weight:700; font-size:14px; color:var(--preto);">
-              Arraste e solte aqui ou <span style="color:var(--dourado); text-decoration:underline;">Abrir arquivos</span>
+              Arraste o PDF da DANFE / Planilha aqui ou <span style="color:var(--dourado); text-decoration:underline;">Abrir arquivos</span>
             </div>
-            <div style="font-size:12px; color:var(--tinta-suave);">Formatos suportados: .CSV ou .XLSX</div>
-            <input id="input_planilha_forn" name="arquivo" type="file" accept=".csv,.xlsx" required style="display:none;"
+            <div style="font-size:12px; color:var(--tinta-suave);">Formatos suportados: <strong>.PDF (DANFE)</strong>, <strong>.XML (NF-e)</strong>, <strong>.CSV</strong> ou <strong>.XLSX</strong></div>
+            <input id="input_planilha_forn" name="arquivo" type="file" accept=".pdf,.xml,.csv,.xlsx" style="display:none;"
                    @change="if ($event.target.files.length) { nomeArquivo = $event.target.files[0].name; estadoUpload = 'enviando'; setTimeout(() => estadoUpload = 'concluido', 350); }">
           </label>
 
@@ -111,7 +120,7 @@
           </div>
         </div>
         <div class="bmq-modal-footer">
-          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;" :disabled="!nomeArquivo">
+          <button type="submit" class="bmq-btn bmq-btn-primario" style="width:100%;">
             Importar
           </button>
         </div>

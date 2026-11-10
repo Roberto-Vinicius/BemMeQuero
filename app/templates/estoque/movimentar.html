@@ -3,14 +3,22 @@
 {% block titulo %}{{ titulo }}{% endblock %}
 {% block titulo_pagina %}Movimentação de estoque{% endblock %}
 {% block conteudo %}
+{% set mapa_saldos = saldos|default({}) %}
 {{ alerta(erro_geral) }}
+{% if request and request.query_params.get('vendido') %}
+<div class="bmq-alerta-ok">
+  Venda registrada: <strong>{{ request.query_params.get('vendido') }} un.</strong> de
+  <strong>{{ request.query_params.get('produto', '') }}</strong> — total
+  <strong>R$ {{ request.query_params.get('total', '0,00')|replace('.', ',') }}</strong>.
+</div>
+{% endif %}
 
 <!-- Card T10: Nova Movimentação estilo Estocaê (s13.png) -->
 <section class="bmq-card" style="padding:24px; max-width:920px;">
   <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
     <div>
       <h2 style="font-size:19px; margin:0;">{{ titulo }}</h2>
-      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Selecione o tipo de operação e preencha os dados do lote</p>
+      <p style="font-size:12.5px; color:var(--tinta-suave); margin:2px 0 0;">Selecione o tipo de operação e preencha os dados</p>
     </div>
     <a href="/estoque/movimentacoes" class="bmq-btn bmq-btn-fantasma">Ver histórico completo →</a>
   </div>
@@ -23,7 +31,7 @@
       </a>
     {% endif %}
     <a href="/estoque/movimentar/venda" class="bmq-seg-mov-btn {{ 'ativo' if tipo == 'venda' }}">
-      {{ icone("saida", 17) }} <span>Saída / Venda</span>
+      {{ icone("venda", 17) }} <span>Saída / Venda</span>
     </a>
     {% if usuario.perfil != Perfil.VENDEDOR %}
       <a href="/estoque/movimentar/ajuste" class="bmq-seg-mov-btn {{ 'ativo' if tipo == 'ajuste' }}">
@@ -38,19 +46,67 @@
     </a>
     {% if usuario.perfil != Perfil.VENDEDOR %}
     <a href="/estoque/movimentar/perda" class="bmq-btn {{ 'bmq-btn-primario' if tipo == 'perda' else 'bmq-btn-secundario' }}" style="height:30px; font-size:12px;">
-      Perda / Avaria / Vencimento
+      Perda / Avaria
     </a>
     {% endif %}
   </div>
 
-  <form method="post" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+  <form method="post" novalidate style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;"
+        x-data="{
+          produtoId: '{{ v.produto_id or '' }}',
+          qtd: '{{ v.quantidade or 1 }}',
+          precoUnit: '{{ v.preco_unitario or '' }}',
+          precoTabela: 0,
+          custoTabela: 0,
+          saldoDisp: 0,
+          atualizarProduto(sel) {
+            const opt = sel ? sel.selectedOptions[0] : null;
+            if (!opt || !opt.value) {
+              this.precoTabela = 0;
+              this.custoTabela = 0;
+              this.saldoDisp = 0;
+              return;
+            }
+            this.precoTabela = parseFloat(opt.dataset.preco || '0') || 0;
+            this.custoTabela = parseFloat(opt.dataset.custo || '0') || 0;
+            this.saldoDisp = parseInt(opt.dataset.saldo || '0', 10) || 0;
+            if (!this.precoUnit) {
+              this.precoUnit = this.precoTabela ? this.precoTabela.toFixed(2).replace('.', ',') : '';
+            }
+          },
+          num(s) {
+            return parseFloat(String(s || '').replace(/\./g, '').replace(',', '.')) || 0;
+          },
+          get unitarioEfetivo() {
+            const p = this.num(this.precoUnit);
+            return p > 0 ? p : this.precoTabela;
+          },
+          get totalVenda() {
+            const q = parseInt(this.qtd || '0', 10) || 0;
+            return (q * this.unitarioEfetivo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          },
+          get lucroEstimado() {
+            const q = parseInt(this.qtd || '0', 10) || 0;
+            return (q * (this.unitarioEfetivo - this.custoTabela)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          }
+        }"
+        x-init="$nextTick(() => atualizarProduto($refs.selProd))">
     <div style="grid-column: 1 / -1;">
       <label class="bmq-label" for="produto_id">Produto *</label>
-      <select id="produto_id" name="produto_id" required class="bmq-select {{ 'erro' if erros.produto_id }}"
+      <select id="produto_id" name="produto_id" x-ref="selProd" x-model="produtoId"
+              class="bmq-select {{ 'erro' if erros.produto_id }}"
+              @change="precoUnit = ''; atualizarProduto($event.target)"
               {% if usa_lote %}hx-get="/estoque/lotes-options?tipo={{ tipo }}" hx-target="#lote_id" hx-trigger="change"{% endif %}>
         <option value="">Pesquise ou selecione um produto…</option>
         {% for p in produtos %}
-          <option value="{{ p.id }}" {{ 'selected' if v.produto_id|string == p.id|string }}>{{ p.nome }} ({{ p.sku }})</option>
+          {% set s_disp = mapa_saldos.get(p.id, 0) %}
+          <option value="{{ p.id }}"
+                  data-preco="{{ p.preco_venda }}"
+                  data-custo="{{ p.preco_custo }}"
+                  data-saldo="{{ s_disp }}"
+                  {{ 'selected' if v.produto_id|string == p.id|string }}>
+            {{ p.nome }} ({{ p.sku }}) — {{ s_disp }} un. · {{ p.preco_venda|brl }}
+          </option>
         {% endfor %}
       </select>
       {% if erros.produto_id %}<p class="bmq-erro-msg">{{ erros.produto_id }}</p>{% endif %}
@@ -59,7 +115,7 @@
     {% if usa_lote %}
     <div style="grid-column: 1 / -1;">
       <label class="bmq-label" for="lote_id">Lote *</label>
-      <select id="lote_id" name="lote_id" required class="bmq-select {{ 'erro' if erros.lote_id }}">
+      <select id="lote_id" name="lote_id" class="bmq-select {{ 'erro' if erros.lote_id }}">
         {% include "estoque/_lotes_options.html" %}
       </select>
       {% if erros.lote_id %}<p class="bmq-erro-msg">{{ erros.lote_id }}</p>{% endif %}
@@ -68,7 +124,7 @@
 
     {% if tipo == "entrada" %}
       {{ campo("numero_lote", "Código da remessa / Lote (opcional)", v, erros, extra='placeholder="Ex.: NF-000005339"') }}
-      {{ campo("quantidade", "Quantidade recebida *", v, erros, "number", 'min="1"') }}
+      {{ campo("quantidade", "Quantidade recebida *", v, erros, "number") }}
       {{ campo("custo_unitario", "Custo unitário (R$) *", v, erros, extra='inputmode="decimal" placeholder="59,90"') }}
       <div>
         <label class="bmq-label" for="fornecedor_id">Fornecedor (opcional)</label>
@@ -81,13 +137,55 @@
       </div>
       {{ campo("motivo", "Nº da Nota Fiscal / Observação", v, erros, extra='placeholder="Ex.: NF 4521 - Compra mensal"') }}
     {% elif tipo == "venda" %}
-      {{ campo("quantidade", "Quantidade de saída *", v, erros, "number", 'min="1"') }}
-      {{ campo("preco_unitario", "Preço unitário praticado (R$) — vazio usa tabela", v, erros, extra='inputmode="decimal"') }}
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <label class="bmq-label" for="quantidade">Quantidade de saída *</label>
+          <span x-show="produtoId" style="font-size:11.5px; font-weight:700;"
+                :style="saldoDisp > 0 ? 'color:var(--sucesso-fg)' : 'color:var(--erro-fg)'"
+                x-text="'Disponível: ' + saldoDisp + ' un.'"></span>
+        </div>
+        <input id="quantidade" name="quantidade" type="number" x-model="qtd"
+               class="bmq-input {{ 'erro' if erros.quantidade }}">
+        {% if erros.quantidade %}<p class="bmq-erro-msg">{{ erros.quantidade }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label class="bmq-label" for="preco_unitario">Preço unitário praticado (R$)</label>
+        <input id="preco_unitario" name="preco_unitario" x-model="precoUnit" inputmode="decimal"
+               placeholder="Vazio usa o preço de tabela"
+               class="bmq-input {{ 'erro' if erros.preco_unitario }}">
+        {% if erros.preco_unitario %}<p class="bmq-erro-msg">{{ erros.preco_unitario }}</p>{% endif %}
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        {{ campo("motivo", "Observação / Cliente / Forma de pagamento (opcional)", v, erros, extra='placeholder="Ex.: Cliente Maria · PIX"') }}
+      </div>
+
+      <div class="bmq-resumo-venda" x-show="produtoId">
+        <div>
+          <div class="rotulo">Estoque disponível</div>
+          <div class="valor" x-text="saldoDisp + ' un.'"></div>
+        </div>
+        <div>
+          <div class="rotulo">Preço unitário</div>
+          <div class="valor" x-text="unitarioEfetivo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })"></div>
+        </div>
+        {% if usuario.perfil != Perfil.VENDEDOR %}
+        <div>
+          <div class="rotulo">Lucro estimado</div>
+          <div class="valor" style="color:var(--sucesso-fg);" x-text="lucroEstimado"></div>
+        </div>
+        {% endif %}
+        <div>
+          <div class="rotulo">Total da venda</div>
+          <div class="valor total" x-text="totalVenda"></div>
+        </div>
+      </div>
     {% elif tipo == "ajuste" %}
-      {{ campo("contagem_real", "Contagem física real do lote *", v, erros, "number", 'min="0"') }}
+      {{ campo("contagem_real", "Contagem física real do lote *", v, erros, "number") }}
       {{ campo("motivo", "Motivo do ajuste de inventário *", v, erros, extra='placeholder="Ex.: Conferência de balanço mensal"') }}
     {% else %}
-      {{ campo("quantidade", "Quantidade *", v, erros, "number", 'min="1"') }}
+      {{ campo("quantidade", "Quantidade *", v, erros, "number") }}
       {{ campo("motivo", "Motivo / Observação *", v, erros, extra='placeholder="Detalhe o motivo da operação"') }}
     {% endif %}
 

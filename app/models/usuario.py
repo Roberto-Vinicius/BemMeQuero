@@ -20,6 +20,8 @@ class Usuario(Base):
     nome: Mapped[str] = mapped_column(String(120))
     sobrenome: Mapped[str | None] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    telefone: Mapped[str | None] = mapped_column(String(40))
+    cargo: Mapped[str | None] = mapped_column(String(80))
     senha_hash: Mapped[str] = mapped_column(String(255))
     perfil: Mapped[Perfil] = mapped_column(Enum(Perfil, native_enum=False, length=20))
     avatar_path: Mapped[str | None] = mapped_column(String(255))

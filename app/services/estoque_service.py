@@ -82,7 +82,10 @@ def registrar_entrada(db: Session, usuario_id: int, dados: EntradaIn, hoje: date
             select(Lote).where(Lote.produto_id == produto.id, Lote.numero_lote == numero).with_for_update()
         )
         if lote:
-            if lote.data_validade != dados.data_validade or lote.custo_unitario != dados.custo_unitario:
+            validade_informada = "data_validade" in dados.model_fields_set
+            if (validade_informada and lote.data_validade != dados.data_validade) or (
+                lote.custo_unitario != dados.custo_unitario
+            ):
                 raise RegraDeNegocioError(
                     f"O lote {numero} já existe com validade/custo diferentes. "
                     "Use o mesmo valor ou informe outro número de lote."

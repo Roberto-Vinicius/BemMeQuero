@@ -1,4 +1,5 @@
 from datetime import date
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/estoque", tags=["estoque"])
 # tipo na URL -> título, perfis permitidos, schema, função do service, usa lote?
 OPERACOES = {
     "entrada": ("Entrada de mercadoria", GESTAO, EntradaIn, estoque_service.registrar_entrada, False),
-    "venda": ("Saída / venda (FEFO)", TODOS, VendaIn, estoque_service.registrar_venda, False),
+    "venda": ("Nova venda", TODOS, VendaIn, estoque_service.registrar_venda, False),
     "ajuste": ("Ajuste de inventário", GESTAO, AjusteIn, estoque_service.registrar_ajuste, True),
     "perda": ("Perda / avaria", GESTAO, PerdaIn, estoque_service.registrar_perda, True),
     "devolucao": ("Devolução", TODOS, DevolucaoIn, estoque_service.registrar_devolucao, True),
@@ -46,10 +47,12 @@ def _ctx_form(db, usuario, tipo, v, erros=None, erro_geral=None):
         pid = 0
     if usa_lote and pid:
         lotes = estoque_repo.lotes_com_saldo(db, pid, tipo not in LOTES_COM_ZERO)
+    saldos = {p.id: s for p, s in estoque_repo.produtos_com_saldo(db)}
     return {
         "usuario": usuario, "tipo": tipo, "titulo": titulo, "usa_lote": usa_lote, "v": v,
         "erros": erros or {}, "erro_geral": erro_geral, "lotes": lotes,
         "produtos": produto_repo.listar(db),
+        "saldos": saldos,
         "fornecedores": list(db.scalars(select(Fornecedor).where(Fornecedor.ativo.is_(True)).order_by(Fornecedor.nome))),
     }
 
@@ -123,12 +126,18 @@ async def registrar(tipo: str, request: Request, db: Session = Depends(get_db),
     form_data = await request.form()
     v = normalizar_form({k: val for k, val in form_data.items() if isinstance(val, str)}, CAMPOS_DECIMAIS_ESTOQUE)
     try:
-        funcao(db, usuario.id, schema(**v))
+        resultado = funcao(db, usuario.id, schema(**v))
     except ValidationError as e:
         return templates.TemplateResponse(request, "estoque/movimentar.html",
                                           _ctx_form(db, usuario, tipo, v, erros_pydantic(e)), status_code=422)
     except RegraDeNegocioError as e:
         return templates.TemplateResponse(request, "estoque/movimentar.html",
                                           _ctx_form(db, usuario, tipo, v, erro_geral=e.mensagem), status_code=e.status_code)
+    if tipo == "venda":
+        movs = resultado if isinstance(resultado, list) else [resultado]
+        qtd = sum(m.quantidade for m in movs)
+        total = sum((m.preco_unitario or 0) * m.quantidade for m in movs)
+        params = urlencode({"vendido": qtd, "total": f"{total:.2f}", "produto": movs[0].produto.nome if movs else ""})
+        return RedirectResponse(f"/estoque/movimentar/venda?{params}", status_code=303)
     return RedirectResponse("/estoque/movimentacoes", status_code=303)
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import NaoEncontradoError, RegraDeNegocioError
 from app.models import Categoria, Marca, Produto
 from app.repositories import produto_repo
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads"
 EXT_PERMITIDAS = {".jpg", ".jpeg", ".png", ".webp"}
-TAMANHO_MAX_FOTO = 2 * 1024 * 1024
+TAMANHO_MAX_FOTO = get_settings().upload_max_foto_mb * 1024 * 1024
 
 
 def _validar(db: Session, dados: ProdutoIn, produto_id: int | None = None) -> None:
@@ -39,16 +40,23 @@ def criar(db: Session, dados: ProdutoIn, foto_path: str | None = None) -> Produt
     return produto
 
 
-def atualizar(db: Session, produto_id: int, dados: ProdutoIn, foto_path: str | None = None) -> Produto:
+def atualizar(
+    db: Session, produto_id: int, dados: ProdutoIn, foto_path: str | None = None, remover_foto: bool = False
+) -> Produto:
     produto = produto_repo.obter(db, produto_id)
     if not produto:
         raise NaoEncontradoError("Produto não encontrado.")
     _validar(db, dados, produto_id)
     for campo, valor in dados.model_dump().items():
         setattr(produto, campo, valor)
+    foto_antiga = produto.foto_path
     if foto_path:
         produto.foto_path = foto_path
+    elif remover_foto:
+        produto.foto_path = None
     db.commit()
+    if foto_antiga and foto_antiga != produto.foto_path:
+        apagar_foto(foto_antiga)
     logger.info("Produto atualizado: %s", produto.sku)
     return produto
 
@@ -73,4 +81,17 @@ def salvar_foto(nome_original: str, conteudo: bytes) -> str:
     nome = f"{uuid.uuid4().hex}{ext}"
     (UPLOAD_DIR / nome).write_bytes(conteudo)
     return f"uploads/{nome}"
+
+
+def apagar_foto(foto_path: str | None) -> None:
+    """Remove o arquivo de foto do disco (somente dentro da pasta de uploads)."""
+    if not foto_path or not foto_path.startswith("uploads/"):
+        return
+    arquivo = (UPLOAD_DIR / Path(foto_path).name).resolve()
+    if arquivo.parent != UPLOAD_DIR.resolve():
+        return
+    try:
+        arquivo.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Não foi possível apagar a foto %s", foto_path)
 

@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: bemmequero-estoque
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /saude
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: APP_NAME
+        value: "Bem Me Quero - Estoque"
+      - key: EMPRESA_NOME
+        value: "Bem Me Quero Perfumaria"
+      - key: EMPRESA_SLOGAN
+        value: "Seu momento de amor-próprio"
+      - key: FUSO_HORARIO
+        value: "America/Fortaleza"
+      - key: MOEDA_PADRAO
+        value: "BRL"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_MAX_AGE_SECONDS
+        value: "28800"
+      - key: SESSION_HTTPS_ONLY
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTO_CREATE_TABLES
+        value: "true"
+      - key: LOGIN_MAX_TENTATIVAS
+        value: "5"
+      - key: LOGIN_JANELA_SEGUNDOS
+        value: "300"
+      - key: UPLOAD_MAX_FOTO_MB
+        value: "2"
+      - key: UPLOAD_MAX_IMPORTACAO_MB
+        value: "10"
+      - key: ESTOQUE_MINIMO_PADRAO
+        value: "3"
+      - key: VALIDADE_PADRAO_DIAS
+        value: "730"
+      - key: ALERTA_VENCIMENTO_DIAS
+        value: "30"
+      - key: MARGEM_LUCRO_PADRAO
+        value: "1.35"
+      - key: SEED_USUARIOS_INICIAIS
+        value: "true"
+      - key: ADMIN_INICIAL_EMAIL
+        value: "admin@bemmequero.local"
+      - key: ESTOQUE_INICIAL_EMAIL
+        value: "estoque@bemmequero.local"
+      - key: VENDAS_INICIAL_EMAIL
+        value: "vendas@bemmequero.local"
+      - key: SENHA_INICIAL_PADRAO
+        sync: false

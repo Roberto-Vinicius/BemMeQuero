@@ -35,11 +35,11 @@
       </div>
       {% endif %}
 
-      <form method="post" action="/login" style="display:flex; flex-direction:column; gap:16px;">
+      <form method="post" novalidate action="/login" style="display:flex; flex-direction:column; gap:16px;">
         <div>
           <label class="bmq-label" for="email">E-mail</label>
           <div style="position:relative;">
-            <input id="email" name="email" type="email" required autofocus value="{{ email }}"
+            <input id="email" name="email" type="text" autofocus value="{{ email }}"
                    placeholder="seu@email.com" class="bmq-input" style="padding-left:38px; height:42px;">
             <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--tinta-suave); display:inline-flex;">
               {{ icone("email", 17) }}
@@ -50,7 +50,7 @@
         <div>
           <label class="bmq-label" for="senha">Senha</label>
           <div style="position:relative;">
-            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'" required
+            <input id="senha" name="senha" :type="mostrarSenha ? 'text' : 'password'"
                    placeholder="••••••••" class="bmq-input" style="padding-right:40px; height:42px;">
             <button type="button" @click="mostrarSenha = !mostrarSenha"
                     :aria-label="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'"

@@ -16,9 +16,10 @@
 
   <!-- COLUNA ESQUERDA: Configurações do Sistema + Estoque + Notificações por E-mail -->
   {% if usuario.perfil == Perfil.ADMIN %}
-  <form method="post" action="/sistema/configuracoes"
+  <form method="post" novalidate action="/sistema/configuracoes"
+        data-emails='{{ emails|tojson }}'
         x-data="{
-          listaEmails: {{ emails|tojson }},
+          listaEmails: JSON.parse($el.dataset.emails || '[]'),
           novoEmail: '',
           adicionarEmail() {
             const v = this.novoEmail.trim().toLowerCase();
@@ -169,7 +170,7 @@
         <h2 style="font-size:16px; margin:0;">Perfil do usuário</h2>
       </div>
 
-      <form method="post" action="/sistema/perfil" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:14px;">
+      <form method="post" novalidate action="/sistema/perfil" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:14px;">
         <!-- Avatar circular grande com botão câmera dourado (s15.png) -->
         <div style="display:flex; align-items:center; gap:16px; margin-bottom:4px;">
           <div style="position:relative; width:72px; height:72px;">
@@ -197,7 +198,7 @@
         <div class="bmq-grid-form-2">
           <div>
             <label class="bmq-label" for="p_nome">Nome *</label>
-            <input id="p_nome" name="nome" required value="{{ usuario.nome }}" class="bmq-input">
+            <input id="p_nome" name="nome" value="{{ usuario.nome }}" class="bmq-input">
           </div>
           <div>
             <label class="bmq-label" for="p_sobrenome">Sobrenome</label>

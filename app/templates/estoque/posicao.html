@@ -36,10 +36,14 @@
     </div>
 
     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-      <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
-        {{ icone("exportar", 16) }} <span>Exportar</span>
+      <a href="/produtos/vitrine.pdf?em_estoque=true{{ '&q=' ~ (q|urlencode) if q else '' }}" target="_blank" rel="noopener" class="bmq-btn bmq-btn-secundario"
+         title="Gerar folha de vitrine em PDF com os produtos disponíveis em estoque para enviar aos clientes">
+        {{ icone("catalogo", 16) }} <span>Catálogo PDF (Clientes)</span>
       </a>
       {% if usuario.perfil != Perfil.VENDEDOR %}
+        <a href="/relatorios/posicao-estoque?formato=xlsx" class="bmq-btn bmq-btn-secundario">
+          {{ icone("exportar", 16) }} <span>Exportar</span>
+        </a>
         <a href="/estoque/movimentar/entrada" class="bmq-btn bmq-btn-primario">
           {{ icone("entrada", 16) }} <span>+ Entrada</span>
         </a>
@@ -72,64 +76,64 @@
       <thead>
         <tr>
           <th>Produto</th>
-          <th class="bmq-hide-sm">Marca</th>
           <th class="bmq-hide-md">Código (SKU)</th>
-          <th class="bmq-hide-md" style="text-align:right;">Valor compra</th>
-          <th style="text-align:right;">Preço</th>
-          <th>Qtd.</th>
-          <th class="bmq-hide-lg" style="text-align:right;">Mínimo</th>
+          {% if usuario.perfil != Perfil.VENDEDOR %}<th class="num bmq-hide-md">Custo</th>{% endif %}
+          <th class="num">Preço</th>
+          <th class="num">Estoque</th>
           <th class="bmq-hide-sm">Status</th>
-          <th style="text-align:right;">Ações</th>
+          <th class="num">Ações</th>
         </tr>
       </thead>
       <tbody>
       {% for p, saldo in linhas %}
         {% set pct = ((saldo / (2 * p.estoque_minimo)) * 100)|round|int if p.estoque_minimo > 0 else 100 %}
-        {% set pct_clamp = 100 if pct > 100 else (6 if pct < 6 and saldo > 0 else pct) %}
+        {% set pct_clamp = 100 if pct > 100 else (6 if pct < 6 and saldo > 0 else (pct if pct > 0 else 0)) %}
         <tr>
-          <td>
-            <a href="/estoque/produto/{{ p.id }}" style="display:flex; align-items:center; gap:8px;">
+          <td class="col-produto">
+            <a href="/estoque/produto/{{ p.id }}" class="bmq-prod-cell" title="{{ p.nome }}">
               {{ tile_produto(p) }}
               <div>
-                <div style="font-weight:700; color:var(--preto);">{{ p.nome }}</div>
-                <div style="font-size:11.5px; color:var(--tinta-suave);">{{ p.categoria.nome if p.categoria else '' }}{% if p.localizacao %} · {{ p.localizacao }}{% endif %}</div>
+                <div class="bmq-prod-nome">{{ p.nome }}</div>
+                <div class="bmq-prod-sub">{{ p.marca.nome if p.marca else '' }}{% if p.categoria %} · {{ p.categoria.nome }}{% endif %}{% if p.localizacao %} · {{ p.localizacao }}{% endif %}</div>
               </div>
             </a>
           </td>
-          <td class="bmq-hide-sm" style="font-weight:600;">{{ p.marca.nome }}</td>
-          <td class="bmq-hide-md" style="font-family:monospace; font-size:12px;">{{ p.sku }}</td>
-          <td class="bmq-hide-md" style="text-align:right; color:var(--tinta-suave);">{{ p.preco_custo|brl }}</td>
-          <td style="text-align:right; font-weight:700; white-space:nowrap;">{{ p.preco_venda|brl }}</td>
-          <td>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <div class="bmq-progress bmq-hide-sm" style="width:76px;">
-                <div class="bmq-progress-bar" style="width:{{ pct_clamp }}%; background:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--sucesso-fg)' }};"></div>
+          <td class="bmq-hide-md" style="font-family:monospace; font-size:12px; white-space:nowrap;">{{ p.sku }}</td>
+          {% if usuario.perfil != Perfil.VENDEDOR %}<td class="num bmq-hide-md" style="color:var(--tinta-suave);">{{ p.preco_custo|brl }}</td>{% endif %}
+          <td class="num" style="font-weight:700;">{{ p.preco_venda|brl }}</td>
+          <td class="num">
+            <div style="display:inline-flex; align-items:center; gap:8px;">
+              <div class="bmq-progress bmq-hide-sm" style="width:64px;">
+                <div class="bmq-progress-fill {{ 'bmq-progress-erro' if saldo < p.estoque_minimo else 'bmq-progress-ok' }}" data-width="{{ pct_clamp }}"></div>
               </div>
-              <strong style="font-weight:800; color:{{ 'var(--erro-fg)' if saldo < p.estoque_minimo else 'var(--preto)' }};">{{ saldo }}</strong>
-              <span style="font-size:11.5px; color:var(--tinta-suave);">un.</span>
+              <span class="bmq-qtd {{ 'baixo' if saldo < p.estoque_minimo }}"><strong>{{ saldo }}</strong> un.</span>
+            </div>
+            <div class="bmq-hide-lg" style="font-size:11px; color:var(--tinta-suave);">
+              mín. {{ p.estoque_minimo }}{% if saldo < p.estoque_minimo %} · Abaixo do mínimo{% endif %}
             </div>
           </td>
-          <td class="bmq-hide-lg" style="text-align:right; color:var(--tinta-suave);">{{ p.estoque_minimo }}</td>
-          <td class="bmq-hide-sm">
-            {{ pill_status_estoque(saldo, p.estoque_minimo) }}
-            {% if saldo < p.estoque_minimo %}
-              <span class="bmq-pill bmq-pill-erro" style="margin-left:4px; font-size:10.5px;">Abaixo do mínimo</span>
-            {% endif %}
-          </td>
-          <td style="text-align:right; white-space:nowrap;">
-            <a href="/estoque/produto/{{ p.id }}" class="bmq-btn bmq-btn-fantasma" style="height:28px; padding:0 8px; font-size:12px; color:var(--rosa);">
-              Ver lotes
-            </a>
-            {% if usuario.perfil != Perfil.VENDEDOR %}
-              <a href="/estoque/movimentar/entrada?produto_id={{ p.id }}" class="bmq-btn bmq-btn-fantasma bmq-hide-sm" style="height:28px; padding:0 8px; font-size:12px;">
-                + Entrada
+          <td class="bmq-hide-sm">{{ pill_status_estoque(saldo, p.estoque_minimo) }}</td>
+          <td class="num">
+            <div class="bmq-acoes">
+              {% if saldo > 0 %}
+                <a href="/estoque/movimentar/venda?produto_id={{ p.id }}" class="bmq-acao" title="Registrar venda" aria-label="Registrar venda">
+                  {{ icone("venda", 16) }}
+                </a>
+              {% endif %}
+              {% if usuario.perfil != Perfil.VENDEDOR %}
+                <a href="/estoque/movimentar/entrada?produto_id={{ p.id }}" class="bmq-acao" title="Registrar entrada" aria-label="Registrar entrada">
+                  {{ icone("entrada", 16) }}
+                </a>
+              {% endif %}
+              <a href="/estoque/produto/{{ p.id }}" class="bmq-acao bmq-hide-sm" title="Ver lotes e histórico" aria-label="Ver lotes">
+                {{ icone("lotes", 16) }}
               </a>
-            {% endif %}
+            </div>
           </td>
         </tr>
       {% else %}
         <tr>
-          <td colspan="9">
+          <td colspan="7">
             {{ estado_vazio("Nenhum produto encontrado.", "Verifique os termos de busca ou cadastre um novo produto.") }}
           </td>
         </tr>
@@ -138,4 +142,9 @@
     </table>
   </div>
 </section>
+<script>
+document.querySelectorAll(".bmq-progress-fill[data-width]").forEach(function (el) {
+  el.style.width = (el.getAttribute("data-width") || "0") + "%";
+});
+</script>
 {% endblock %}

@@ -66,7 +66,11 @@ def primeiro_acesso_criar(
 
 
 @router.post("/login")
-def login(request: Request, email: str = Form(...), senha: str = Form(...), db: Session = Depends(get_db)):
+def login(request: Request, email: str = Form(""), senha: str = Form(""), db: Session = Depends(get_db)):
+    if not email.strip() or not senha:
+        return templates.TemplateResponse(
+            request, "login.html", {"erro": "Informe o e-mail e a senha.", "email": email}, status_code=422
+        )
     chave = f"{request.client.host if request.client else '-'}|{email.strip().lower()}"
     if limitador_login.bloqueado(chave):
         return templates.TemplateResponse(

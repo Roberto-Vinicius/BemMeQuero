@@ -95,7 +95,7 @@ def salvar_configuracoes(
 @router.post("/perfil")
 async def salvar_perfil(
     request: Request,
-    nome: str = Form(...),
+    nome: str = Form(""),
     sobrenome: str = Form(""),
     telefone: str = Form(""),
     cargo: str = Form(""),

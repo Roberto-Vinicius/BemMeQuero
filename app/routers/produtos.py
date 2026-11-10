@@ -1,6 +1,5 @@
 import csv
 import io
-from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -17,14 +16,24 @@ from app.repositories import estoque_repo, produto_repo
 from app.schemas.comum import erros_pydantic, normalizar_form
 from app.schemas.estoque import EntradaIn
 from app.schemas.produto import CAMPOS_DECIMAIS, ProdutoIn
-from app.services import cadastro_service, estoque_service, importacao_pedido_service, produto_service
+from app.services import (
+    cadastro_service,
+    estoque_service,
+    importacao_pedido_service,
+    produto_service,
+    vitrine_pdf_service,
+)
 
 router = APIRouter(prefix="/produtos", tags=["produtos"])
 
 
 def _proximo_sku(db: Session) -> str:
-    total = db.scalar(select(func.count(Produto.id))) or 0
-    return f"BMQ-{total + 1:04d}"
+    """Próximo SKU sequencial livre (pula códigos já usados, ex.: vindos de importação)."""
+    n = (db.scalar(select(func.count(Produto.id))) or 0) + 1
+    usados = set(db.scalars(select(Produto.sku)))
+    while f"BMQ-{n:04d}" in usados:
+        n += 1
+    return f"BMQ-{n:04d}"
 
 
 def _form_ctx(db, usuario, valores, erros=None, erro_geral=None, produto=None):
@@ -41,19 +50,33 @@ def _form_ctx(db, usuario, valores, erros=None, erro_geral=None, produto=None):
     }
 
 
+def _int_opc(val: int | str | None) -> int | None:
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str) and val.strip().isdigit():
+        return int(val.strip())
+    return None
+
+
 @router.get("")
 def listar(
     request: Request,
     q: str | None = None,
-    categoria_id: int | None = None,
+    categoria_id: int | str | None = None,
+    marca_id: int | str | None = None,
+    em_estoque: bool = False,
     inativos: bool = False,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_role(*TODOS)),
 ):
-    produtos = produto_repo.listar(db, q, categoria_id, inativos)
+    cat_id = _int_opc(categoria_id)
+    mar_id = _int_opc(marca_id)
+    produtos = produto_repo.listar(db, q, cat_id, inativos, marca_id=mar_id)
     todos = produto_repo.listar(db, incluir_inativos=True)
     saldos_pares = estoque_repo.produtos_com_saldo(db)
     saldos = {p.id: s for p, s in saldos_pares}
+    if em_estoque:
+        produtos = [p for p in produtos if saldos.get(p.id, 0) > 0]
 
     total_produtos = len(todos)
     total_ativos = sum(1 for p in todos if p.ativo)
@@ -65,7 +88,9 @@ def listar(
         "produtos": produtos,
         "saldos": saldos,
         "q": q or "",
-        "categoria_id": categoria_id,
+        "categoria_id": cat_id,
+        "marca_id": mar_id,
+        "em_estoque": em_estoque,
         "inativos": inativos,
         "categorias": cadastro_service.listar_nomes(db, "categorias"),
         "marcas": cadastro_service.listar_nomes(db, "marcas"),
@@ -79,6 +104,39 @@ def listar(
     }
     nome = "produtos/_tabela.html" if request.headers.get("HX-Request") else "produtos/lista.html"
     return templates.TemplateResponse(request, nome, ctx)
+
+
+@router.get("/vitrine.pdf")
+def gerar_vitrine_clientes(
+    q: str | None = None,
+    categoria_id: int | str | None = None,
+    marca_id: int | str | None = None,
+    em_estoque: bool = False,
+    baixar: bool = False,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_role(*TODOS)),
+):
+    cat_id = _int_opc(categoria_id)
+    mar_id = _int_opc(marca_id)
+    produtos = produto_repo.listar(db, q, cat_id, incluir_inativos=False, marca_id=mar_id)
+    saldos = {p.id: s for p, s in estoque_repo.produtos_com_saldo(db)}
+    itens = [(p, saldos.get(p.id, 0)) for p in produtos if (not em_estoque or saldos.get(p.id, 0) > 0)]
+
+    cat_obj = db.get(Categoria, cat_id) if cat_id else None
+    mar_obj = db.get(Marca, mar_id) if mar_id else None
+    pdf_bytes = vitrine_pdf_service.gerar_vitrine_pdf(
+        itens,
+        busca=(q or "").strip(),
+        categoria_nome=cat_obj.nome if cat_obj else None,
+        marca_nome=mar_obj.nome if mar_obj else None,
+        apenas_em_estoque=em_estoque,
+    )
+    disp = "attachment" if baixar else "inline"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'{disp}; filename="catalogo_vitrine_bemmequero.pdf"'},
+    )
 
 
 @router.get("/novo")
@@ -102,48 +160,67 @@ def editar_form(
     )
 
 
-async def _processar(request, db, usuario, produto_id, foto, campos, extras=None):
+def _ler_estoque_inicial(extras: dict | None) -> tuple[int, str | None]:
+    """Retorna (quantidade, erro). Vazio = 0."""
+    bruto = ((extras or {}).get("estoque_inicial") or "").strip()
+    if not bruto:
+        return 0, None
+    try:
+        qtd = int(bruto)
+    except ValueError:
+        return 0, "Informe um número inteiro."
+    if qtd < 0:
+        return 0, "O valor não pode ser negativo."
+    return qtd, None
+
+
+async def _processar(request, db, usuario, produto_id, foto, campos, extras=None, remover_foto=False):
     campos["ativo"] = campos.get("ativo") == "on"
     dados = normalizar_form(campos, CAMPOS_DECIMAIS)
+    if extras:
+        dados.update({k: v for k, v in extras.items() if v is not None})
     produto = produto_repo.obter(db, produto_id) if produto_id else None
+    foto_path = None
+    criado = None
     try:
-        validado = ProdutoIn(**dados)
-        foto_path = None
+        validado = ProdutoIn(**{k: v for k, v in dados.items() if k in _CAMPOS})
+        qtd_ini, erro_qtd = _ler_estoque_inicial(extras)
+        if erro_qtd:
+            ctx = _form_ctx(db, usuario, dados, {"estoque_inicial": erro_qtd}, produto=produto)
+            return templates.TemplateResponse(request, "produtos/form.html", ctx, status_code=422)
         if foto and getattr(foto, "filename", None):
             foto_path = produto_service.salvar_foto(foto.filename, await foto.read())
         if produto_id:
-            produto_service.atualizar(db, produto_id, validado, foto_path)
+            produto_service.atualizar(db, produto_id, validado, foto_path, remover_foto)
         else:
             criado = produto_service.criar(db, validado, foto_path)
-            if extras:
-                qtd_ini = int(extras.get("estoque_inicial") or 0)
-                if qtd_ini > 0:
-                    lote_ini = (extras.get("lote_inicial") or f"LOTE-{criado.sku}").strip()
-                    val_str = (extras.get("validade_inicial") or "").strip()
-                    try:
-                        val_dt = date.fromisoformat(val_str) if val_str else (date.today() + timedelta(days=365))
-                    except ValueError:
-                        val_dt = date.today() + timedelta(days=365)
-                    estoque_service.registrar_entrada(
-                        db,
-                        usuario.id,
-                        EntradaIn(
-                            produto_id=criado.id,
-                            numero_lote=lote_ini,
-                            data_validade=val_dt,
-                            quantidade=qtd_ini,
-                            custo_unitario=criado.preco_custo or Decimal("1.00"),
-                            fornecedor_id=criado.fornecedor_id,
-                            motivo="Estoque inicial no cadastro",
-                        ),
-                    )
+            if qtd_ini > 0:
+                lote_ini = ((extras or {}).get("lote_inicial") or "").strip() or f"LOTE-{criado.sku}"
+                estoque_service.registrar_entrada(
+                    db,
+                    usuario.id,
+                    EntradaIn(
+                        produto_id=criado.id,
+                        numero_lote=lote_ini,
+                        quantidade=qtd_ini,
+                        custo_unitario=criado.preco_custo or Decimal("0"),
+                        fornecedor_id=criado.fornecedor_id,
+                        motivo="Estoque inicial no cadastro",
+                    ),
+                )
     except ValidationError as e:
+        if criado:  # produto já salvo; só o estoque inicial falhou
+            return RedirectResponse(f"/produtos/{criado.id}/editar?aviso_estoque=1", status_code=303)
+        produto_service.apagar_foto(foto_path)
         ctx = _form_ctx(db, usuario, dados, erros_pydantic(e), produto=produto)
         return templates.TemplateResponse(request, "produtos/form.html", ctx, status_code=422)
     except RegraDeNegocioError as e:
+        if criado:
+            return RedirectResponse(f"/produtos/{criado.id}/editar?aviso_estoque=1", status_code=303)
+        produto_service.apagar_foto(foto_path)
         ctx = _form_ctx(db, usuario, dados, erro_geral=e.mensagem, produto=produto)
         return templates.TemplateResponse(request, "produtos/form.html", ctx, status_code=e.status_code)
-    return RedirectResponse("/produtos", status_code=303)
+    return RedirectResponse("/produtos?salvo=1", status_code=303)
 
 
 _CAMPOS = (
@@ -154,20 +231,20 @@ _CAMPOS = (
 )
 
 
-async def _campos(request: Request) -> tuple[dict, UploadFile | None, dict]:
+async def _campos(request: Request) -> tuple[dict, UploadFile | None, dict, bool]:
     form = await request.form()
     campos = {k: form.get(k) for k in _CAMPOS if form.get(k) is not None}
     extras = {
         "estoque_inicial": form.get("estoque_inicial"),
         "lote_inicial": form.get("lote_inicial"),
-        "validade_inicial": form.get("validade_inicial"),
     }
-    return campos, form.get("foto"), extras
+    remover_foto = form.get("remover_foto") == "1"
+    return campos, form.get("foto"), extras, remover_foto
 
 
 @router.post("/novo")
 async def criar(request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(require_role(*GESTAO))):
-    campos, foto, extras = await _campos(request)
+    campos, foto, extras, _ = await _campos(request)
     return await _processar(request, db, usuario, None, foto, campos, extras)
 
 
@@ -178,8 +255,8 @@ async def atualizar(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_role(*GESTAO)),
 ):
-    campos, foto, _ = await _campos(request)
-    return await _processar(request, db, usuario, produto_id, foto, campos)
+    campos, foto, _, remover_foto = await _campos(request)
+    return await _processar(request, db, usuario, produto_id, foto, campos, remover_foto=remover_foto)
 
 
 @router.post("/{produto_id}/ativo")
@@ -205,10 +282,12 @@ def baixar_modelo_planilha(usuario: Usuario = Depends(require_role(*GESTAO))):
 @router.post("/importar")
 async def importar_planilha(
     request: Request,
-    arquivo: UploadFile = File(...),
+    arquivo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_role(*GESTAO)),
 ):
+    if not arquivo or not getattr(arquivo, "filename", None):
+        return RedirectResponse("/produtos?erro_importacao=Selecione+um+arquivo+para+importar.", status_code=303)
     raw = await arquivo.read()
     try:
         res = importacao_pedido_service.importar_arquivo_pedido(

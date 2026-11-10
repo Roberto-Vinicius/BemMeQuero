@@ -34,5 +34,9 @@ class LimitadorTentativas:
             self._falhas.pop(chave, None)
 
 
-limitador_login = LimitadorTentativas()
+from app.core.config import get_settings as _get_settings
+
+_s = _get_settings()
+limitador_login = LimitadorTentativas(maximo=_s.login_max_tentativas, janela_segundos=_s.login_janela_segundos)
+
 

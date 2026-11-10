@@ -20,8 +20,8 @@
     </div>
   </div>
 
-  <form method="post" action="/cadastros/{{ tipo }}" style="padding:16px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; gap:10px;">
-    <input name="nome" placeholder="Nova {{ rotulo|lower }}…" required class="bmq-input" style="flex:1;">
+  <form method="post" novalidate action="/cadastros/{{ tipo }}" style="padding:16px 22px; background:rgba(252,250,237,0.55); border-bottom:1px solid var(--linha); display:flex; gap:10px;">
+    <input name="nome" placeholder="Nova {{ rotulo|lower }}…" class="bmq-input" style="flex:1;">
     <button type="submit" class="bmq-btn bmq-btn-primario">
       {{ icone("adicionar", 16) }} <span>Adicionar</span>
     </button>

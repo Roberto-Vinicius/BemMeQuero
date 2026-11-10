@@ -85,7 +85,11 @@
       </div>
       <p style="font-size:12px; color:var(--tinta-suave); margin:0 0 12px;">Distribuição real por categoria e dinheiro investido</p>
       <div style="height:175px; position:relative;">
-        <canvas id="bmqChartCategorias"></canvas>
+        <canvas
+          id="bmqChartCategorias"
+          data-labels='[{% for c in p.categorias %}{{ c.nome|tojson }}{{ ", " if not loop.last }}{% endfor %}]'
+          data-values='[{% for c in p.categorias %}{{ c.unidades }}{{ ", " if not loop.last }}{% endfor %}]'
+        ></canvas>
       </div>
     </div>
 
@@ -151,7 +155,7 @@
             <td>
               <div style="display:flex; align-items:center; gap:8px;">
                 <div class="bmq-hide-sm" style="width:72px; height:6px; background:var(--linha); border-radius:999px; overflow:hidden;">
-                  <div style="height:100%; width:{{ pct_clamp }}%; background:{{ 'var(--erro-fg)' if a.saldo <= (a.produto.estoque_minimo // 2) else 'var(--atencao-fg)' }};"></div>
+                  <div class="bmq-progress-fill {{ 'bmq-progress-erro' if a.saldo <= (a.produto.estoque_minimo // 2) else 'bmq-progress-atencao' }}" data-width="{{ pct_clamp }}"></div>
                 </div>
                 <strong>{{ a.saldo }} un.</strong>
               </div>
@@ -181,7 +185,7 @@
     <div style="display:flex; flex-direction:column; gap:10px;">
       {% for m in p.ultimos[:7] %}
       <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; padding-bottom:8px; border-bottom:1px solid var(--linha);">
-        <span class="bmq-kpi-bubble" style="width:30px; height:30px; {{ 'background:var(--sucesso-bg); color:var(--sucesso-fg);' if m.sinal > 0 else 'background:var(--erro-bg); color:var(--erro-fg);' }}">
+        <span class="bmq-kpi-bubble {{ 'bmq-bubble-sucesso' if m.sinal > 0 else 'bmq-bubble-erro' }}">
           {{ icone("entrada" if m.sinal > 0 else "saida", 14) }}
         </span>
         <div style="flex:1; min-width:0;">
@@ -200,11 +204,22 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".bmq-progress-fill[data-width]").forEach(function (el) {
+    el.style.width = (el.getAttribute("data-width") || "0") + "%";
+  });
+
   if (!window.Chart) return;
   const ctx2 = document.getElementById("bmqChartCategorias");
   if (ctx2) {
-    const catLabels = [{% for c in p.categorias %}"{{ c.nome }}"{{ ", " if not loop.last }}{% endfor %}];
-    const catData = [{% for c in p.categorias %}{{ c.unidades }}{{ ", " if not loop.last }}{% endfor %}];
+    let catLabels = [];
+    let catData = [];
+    try {
+      catLabels = JSON.parse(ctx2.getAttribute("data-labels") || "[]");
+      catData = JSON.parse(ctx2.getAttribute("data-values") || "[]");
+    } catch (e) {
+      catLabels = [];
+      catData = [];
+    }
     new Chart(ctx2, {
       type: "doughnut",
       data: {

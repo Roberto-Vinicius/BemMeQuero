@@ -4,26 +4,38 @@
 {% block titulo_pagina %}{{ 'Editar produto' if produto else 'Adicionar novo produto' }}{% endblock %}
 {% block conteudo %}
 {% set is_dict = v is mapping %}
-{% set val_custo = (v.get('preco_custo') if is_dict else v.preco_custo) or '' %}
-{% set val_venda = (v.get('preco_venda') if is_dict else v.preco_venda) or '' %}
+{% set val_custo = (v.get('preco_custo') if is_dict else v.preco_custo) %}
+{% set val_venda = (v.get('preco_venda') if is_dict else v.preco_venda) %}
+{% set val_custo = ('%.2f'|format(val_custo)|replace('.', ',')) if val_custo is number else (val_custo or '') %}
+{% set val_venda = ('%.2f'|format(val_venda)|replace('.', ',')) if val_venda is number else (val_venda or '') %}
 {% set val_sku = (v.get('sku') if is_dict else v.sku) or proximo_sku|default('BMQ-0001') %}
 {% set val_barras = (v.get('codigo_barras') if is_dict else v.codigo_barras) or '' %}
 {% set val_ativo = v.get('ativo', True) if is_dict else v.ativo %}
+{% set foto_atual = ('/static/' ~ produto.foto_path) if produto and produto.foto_path else '' %}
 
 {{ alerta(erro_geral) }}
+{% if request and request.query_params.get('aviso_estoque') %}
+  {{ alerta("Produto salvo, mas não foi possível lançar o estoque inicial. Registre a entrada em Estoque → + Entrada.") }}
+{% endif %}
 
-<form method="post" enctype="multipart/form-data" class="bmq-card"
-      style="padding:24px; max-width:1040px;"
+<form method="post" novalidate enctype="multipart/form-data" class="bmq-card bmq-form-produto"
+      data-sku="{{ val_sku }}" data-sku-sugerido="{{ proximo_sku|default('BMQ-0001') }}"
+      data-barras="{{ val_barras }}" data-custo="{{ val_custo }}" data-venda="{{ val_venda }}"
+      data-foto="{{ foto_atual }}"
       x-data="{
-        sku: '{{ val_sku }}',
-        barras: '{{ val_barras }}',
-        custo: '{{ val_custo }}',
-        venda: '{{ val_venda }}',
-        previewUrl: '{{ ('/static/' ~ produto.foto_path) if produto and produto.foto_path else '' }}',
-        detalhesAbertos: {{ 'true' if not produto else 'false' }},
+        sku: $el.dataset.sku,
+        barras: $el.dataset.barras,
+        custo: $el.dataset.custo,
+        venda: $el.dataset.venda,
+        previewUrl: $el.dataset.foto,
+        nomeFoto: '',
+        erroFoto: '',
+        removerFoto: '0',
+        arrastando: false,
+        enviando: false,
+        detalhesAbertos: {{ 'true' if not produto or erros.estoque_inicial else 'false' }},
         gerarSku() {
-          const rnd = Math.floor(1000 + Math.random() * 9000);
-          this.sku = 'BMQ-' + rnd;
+          this.sku = this.$el.dataset.skuSugerido;
         },
         gerarBarras() {
           let base = '789' + String(Math.floor(100000000 + Math.random() * 899999999));
@@ -32,60 +44,111 @@
           let dv = (10 - (soma % 10)) % 10;
           this.barras = base + String(dv);
         },
+        aplicarFoto(arquivo) {
+          this.erroFoto = '';
+          if (!arquivo) return;
+          this.previewUrl = URL.createObjectURL(arquivo);
+          this.nomeFoto = arquivo.name;
+          this.removerFoto = '0';
+        },
+        soltarFoto(e) {
+          this.arrastando = false;
+          const arquivo = e.dataTransfer.files[0];
+          if (!arquivo) return;
+          const dt = new DataTransfer();
+          dt.items.add(arquivo);
+          this.$refs.foto.files = dt.files;
+          this.aplicarFoto(arquivo);
+        },
+        limparFoto() {
+          this.previewUrl = '';
+          this.nomeFoto = '';
+          this.erroFoto = '';
+          this.$refs.foto.value = '';
+          this.removerFoto = '1';
+        },
+        num(s) {
+          return parseFloat(String(s || '').replace(/\./g, '').replace(',', '.')) || 0;
+        },
         get margem() {
-          const c = parseFloat(String(this.custo).replace(',', '.')) || 0;
-          const vd = parseFloat(String(this.venda).replace(',', '.')) || 0;
+          const c = this.num(this.custo), vd = this.num(this.venda);
           if (c <= 0 || vd <= 0) return null;
-          return (((vd - c) / c) * 100).toFixed(1);
+          return (((vd - c) / c) * 100).toFixed(1).replace('.', ',');
+        },
+        get lucroUnit() {
+          const c = this.num(this.custo), vd = this.num(this.venda);
+          if (c <= 0 || vd <= 0) return null;
+          return (vd - c).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        },
+        get prejuizo() {
+          return this.num(this.venda) > 0 && this.num(this.venda) < this.num(this.custo);
         }
-      }">
+      }"
+      @submit="enviando = true">
 
-  <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:16px; margin-bottom:20px; border-bottom:1px solid var(--linha);">
-    <div style="display:flex; align-items:center; gap:10px;">
+  <div class="bmq-form-header">
+    <div style="display:flex; align-items:center; gap:10px; min-width:0;">
       <span class="bmq-kpi-bubble d-dourado" style="width:36px; height:36px;">
         {{ icone("perfume", 18) }}
       </span>
-      <div>
+      <div style="min-width:0;">
         <h2 style="font-size:19px; margin:0;">{{ 'Editar produto' if produto else 'Adicionar novo produto' }}</h2>
-        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Preencha os dados cadastrais, precificação e características de perfumaria</p>
+        <p style="font-size:12px; color:var(--tinta-suave); margin:2px 0 0;">Campos com * são obrigatórios</p>
       </div>
     </div>
-    <a href="/produtos" class="bmq-btn bmq-btn-fantasma">← Voltar para produtos</a>
+    <a href="/produtos" class="bmq-btn bmq-btn-fantasma">← Voltar</a>
   </div>
 
-  <!-- Layout em 2 colunas estilo Estocaê (T06 - s06.png) -->
   <div class="bmq-grid-2col">
 
-    <!-- COLUNA ESQUERDA: Imagem, Nome, Código SKU, Descrição -->
+    <!-- COLUNA ESQUERDA: Foto, Nome, SKU, Descrição -->
     <div style="display:flex; flex-direction:column; gap:14px; min-width:0;">
       <div>
-        <label class="bmq-label" for="foto">Imagem do produto</label>
-        <label for="foto" class="bmq-dropzone" style="padding:18px;">
-          <template x-if="previewUrl">
-            <img :src="previewUrl" alt="Prévia do produto" style="width:84px; height:84px; object-fit:cover; border-radius:8px; border:1px solid var(--linha);">
-          </template>
-          <template x-if="!previewUrl">
-            <span class="bmq-kpi-bubble d-dourado" style="width:44px; height:44px;">
-              {{ icone("imagem-mais", 22) }}
-            </span>
-          </template>
-          <div style="font-size:13px; font-weight:700;">
-            <span style="color:var(--dourado-escuro); text-decoration:underline;">Enviar uma imagem</span> ou arraste e solte
+        <label class="bmq-label" for="foto">Foto do produto</label>
+        <div class="bmq-foto-upload" :class="{ 'arrastando': arrastando, 'com-foto': previewUrl }"
+             @dragover.prevent="arrastando = true" @dragleave.prevent="arrastando = false" @drop.prevent="soltarFoto($event)">
+          <label for="foto" class="bmq-foto-preview" title="Clique para escolher uma foto">
+            <template x-if="previewUrl">
+              <img :src="previewUrl" alt="Foto do produto">
+            </template>
+            <template x-if="!previewUrl">
+              <span class="bmq-foto-vazia">
+                {{ icone("imagem-mais", 28) }}
+                <span>Sem foto</span>
+              </span>
+            </template>
+          </label>
+          <div class="bmq-foto-info">
+            <div style="font-size:13px; font-weight:700; color:var(--tinta);">
+              <span x-show="!previewUrl">Arraste uma imagem aqui ou</span>
+              <span x-show="previewUrl" x-text="nomeFoto || 'Foto atual do produto'"></span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <label for="foto" class="bmq-btn bmq-btn-secundario" style="height:32px; font-size:12.5px; cursor:pointer;">
+                {{ icone("upload", 15) }} <span x-text="previewUrl ? 'Trocar foto' : 'Escolher foto'"></span>
+              </label>
+              <button type="button" class="bmq-btn bmq-btn-fantasma" style="height:32px; font-size:12.5px; color:var(--erro-fg);"
+                      x-show="previewUrl" @click="limparFoto()">
+                {{ icone("fechar", 14) }} <span>Remover</span>
+              </button>
+            </div>
+            <div style="font-size:11.5px; color:var(--tinta-suave);">JPG, PNG ou WEBP · até 2 MB · ideal quadrada</div>
+            <p class="bmq-erro-msg" x-show="erroFoto" x-text="erroFoto"></p>
           </div>
-          <div style="font-size:11.5px; color:var(--tinta-suave);">PNG, JPG ou WEBP até 2 MB</div>
-          <input id="foto" name="foto" type="file" accept=".jpg,.jpeg,.png,.webp" style="display:none;"
-                 @change="if ($event.target.files[0]) previewUrl = URL.createObjectURL($event.target.files[0])">
-        </label>
+          <input id="foto" name="foto" type="file" x-ref="foto" accept="image/jpeg,image/png,image/webp" class="bmq-sr-only"
+                 @change="aplicarFoto($event.target.files[0])">
+          <input type="hidden" name="remover_foto" :value="removerFoto">
+        </div>
       </div>
 
-      {{ campo("nome", "Nome do produto *", v, erros, extra='placeholder="Ex.: Floratta Red Eau de Toilette 75 ml" required') }}
+      {{ campo("nome", "Nome do produto *", v, erros, extra='placeholder="Ex.: Floratta Red Eau de Toilette 75 ml"') }}
 
       <div>
         <label class="bmq-label" for="sku">Código do produto (SKU) *</label>
         <div class="bmq-input-group">
-          <input id="sku" name="sku" x-model="sku" required placeholder="BMQ-0001"
+          <input id="sku" name="sku" x-model="sku" placeholder="BMQ-0001"
                  class="bmq-input {{ 'erro' if erros.sku }}">
-          <button type="button" class="bmq-input-addon-btn" @click="gerarSku()" title="Gerar próximo código SKU">
+          <button type="button" class="bmq-input-addon-btn" @click="gerarSku()" title="Usar o próximo código livre">
             {{ icone("atualizar", 16) }}
           </button>
         </div>
@@ -120,7 +183,7 @@
       <div class="bmq-grid-form-2">
         <div>
           <label class="bmq-label" for="preco_custo">Preço de custo (R$) *</label>
-          <input id="preco_custo" name="preco_custo" x-model="custo" inputmode="decimal" placeholder="59,90" required
+          <input id="preco_custo" name="preco_custo" x-model="custo" inputmode="decimal" placeholder="59,90"
                  class="bmq-input {{ 'erro' if erros.preco_custo }}">
           {% if erros.preco_custo %}<p class="bmq-erro-msg">{{ erros.preco_custo }}</p>{% endif %}
         </div>
@@ -128,17 +191,21 @@
           <div style="display:flex; align-items:center; justify-content:space-between;">
             <label class="bmq-label" for="preco_venda">Preço de venda (R$) *</label>
             <template x-if="margem !== null">
-              <span class="bmq-pill bmq-pill-sucesso" style="font-size:10.5px; padding:1px 7px;" x-text="'Margem: +' + margem + '%'"></span>
+              <span class="bmq-pill" :class="prejuizo ? 'bmq-pill-erro' : 'bmq-pill-sucesso'" style="font-size:10.5px; padding:1px 7px;"
+                    x-text="'Margem: ' + (prejuizo ? '' : '+') + margem + '%'"></span>
             </template>
           </div>
-          <input id="preco_venda" name="preco_venda" x-model="venda" inputmode="decimal" placeholder="129,90" required
+          <input id="preco_venda" name="preco_venda" x-model="venda" inputmode="decimal" placeholder="129,90"
                  class="bmq-input {{ 'erro' if erros.preco_venda }}">
           {% if erros.preco_venda %}<p class="bmq-erro-msg">{{ erros.preco_venda }}</p>{% endif %}
+          <p x-show="lucroUnit !== null" style="font-size:11.5px; margin:4px 0 0;"
+             :style="prejuizo ? 'color:var(--erro-fg)' : 'color:var(--sucesso-fg)'"
+             x-text="prejuizo ? 'Atenção: preço de venda abaixo do custo (' + lucroUnit + ' por unidade)' : 'Lucro por unidade: ' + lucroUnit"></p>
         </div>
       </div>
 
       <div class="bmq-grid-form-2">
-        {{ campo("estoque_minimo", "Quantidade mínima", v, erros, "number", 'min="0"') }}
+        {{ campo("estoque_minimo", "Quantidade mínima", v, erros, "number") }}
 
         <div>
           <label class="bmq-label" for="codigo_barras">Código de barras (EAN-13)</label>
@@ -238,25 +305,26 @@
       {% if not produto %}
       <div>
         <label class="bmq-label" for="estoque_inicial">Estoque inicial (un.)</label>
-        <input id="estoque_inicial" name="estoque_inicial" type="number" min="0" value="0" class="bmq-input">
+        <input id="estoque_inicial" name="estoque_inicial" type="number"
+               value="{{ (v.get('estoque_inicial') or 0) if is_dict else 0 }}"
+               class="bmq-input {{ 'erro' if erros.estoque_inicial }}">
+        {% if erros.estoque_inicial %}<p class="bmq-erro-msg">{{ erros.estoque_inicial }}</p>{% endif %}
+        <p style="font-size:11.5px; color:var(--tinta-suave); margin:4px 0 0;">Lança a entrada automaticamente com o preço de custo.</p>
       </div>
       <div>
-        <label class="bmq-label" for="lote_inicial">Lote inicial</label>
-        <input id="lote_inicial" name="lote_inicial" placeholder="Ex.: LOTE-2026A" class="bmq-input">
-      </div>
-      <div>
-        <label class="bmq-label" for="validade_inicial">Data de validade do lote</label>
-        <input id="validade_inicial" name="validade_inicial" type="date" class="bmq-input">
+        <label class="bmq-label" for="lote_inicial">Código da remessa / NF (opcional)</label>
+        <input id="lote_inicial" name="lote_inicial" placeholder="Ex.: NF-000123"
+               value="{{ (v.get('lote_inicial') or '') if is_dict else '' }}" class="bmq-input">
       </div>
       {% endif %}
     </div>
   </div>
 
   <!-- Rodapé do formulário -->
-  <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--linha); display:flex; align-items:center; justify-content:flex-end; gap:12px;">
+  <div class="bmq-form-footer">
     <a href="/produtos" class="bmq-btn bmq-btn-secundario">Cancelar</a>
     <button type="submit" class="bmq-btn bmq-btn-primario">
-      {{ icone("confirmado", 16) }} <span>Salvar</span>
+      {{ icone("confirmado", 16) }} <span>Salvar produto</span>
     </button>
   </div>
 </form>

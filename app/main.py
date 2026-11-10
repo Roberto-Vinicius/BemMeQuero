@@ -6,12 +6,18 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+from sqlalchemy import func, select
+
 from app.core.config import get_settings, validar_producao
 from app.core.deps import NaoAutenticadoError, SemPermissaoError
 from app.core.exceptions import RegraDeNegocioError
 from app.core.logging import setup_logging
 from app.core.templates import templates
+from app.db.base import Base
+from app.db.session import SessionLocal, engine
+from app.models import Perfil, Usuario
 from app.routers import auth, cadastros, dashboard, estoque, fornecedores, produtos, relatorios, sistema, usuarios
+from app.services import auth_service
 
 settings = get_settings()
 validar_producao(settings)
@@ -21,13 +27,38 @@ logger = logging.getLogger("bemmequero")
 BASE_DIR = Path(__file__).resolve().parent
 (BASE_DIR / "static" / "uploads").mkdir(parents=True, exist_ok=True)
 
+
+def _inicializar_banco() -> None:
+    if not settings.auto_create_tables:
+        return
+    try:
+        Base.metadata.create_all(bind=engine)
+        if settings.seed_usuarios_iniciais and settings.senha_inicial_padrao:
+            with SessionLocal() as db:
+                total = db.scalar(select(func.count(Usuario.id))) or 0
+                if total == 0:
+                    contas = [
+                        ("Administrador", settings.admin_inicial_email, Perfil.ADMIN),
+                        ("Estoquista", settings.estoque_inicial_email, Perfil.ESTOQUISTA),
+                        ("Vendedora", settings.vendas_inicial_email, Perfil.VENDEDOR),
+                    ]
+                    for nome, email, perfil in contas:
+                        if email:
+                            auth_service.criar_usuario(db, nome, email, settings.senha_inicial_padrao, perfil)
+                    logger.info("Perfis iniciais criados automaticamente a partir do .env")
+    except Exception:
+        logger.exception("Falha ao inicializar tabelas/usuários iniciais")
+
+
+_inicializar_banco()
+
 app = FastAPI(title=settings.app_name, debug=settings.debug)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     max_age=settings.session_max_age_seconds,
     same_site="lax",  # mitiga CSRF nos formulários POST
-    https_only=not settings.debug,
+    https_only=settings.session_https_only if settings.session_https_only is not None else (not settings.debug),
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 

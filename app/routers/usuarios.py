@@ -57,7 +57,7 @@ def criar(
 def editar(
     uid: int,
     request: Request,
-    perfil: str = Form(...),
+    perfil: str = Form("vendedor"),
     nova_senha: str = Form(""),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_role(*ADMIN)),

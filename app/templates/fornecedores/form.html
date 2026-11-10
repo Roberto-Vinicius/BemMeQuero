@@ -11,7 +11,7 @@
 
 {{ alerta(erro_geral) }}
 
-<form method="post" x-data="{ contatoSecAberto: false }">
+<form method="post" novalidate x-data="{ contatoSecAberto: false }">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
     <div>
       <h2 style="font-size:20px; margin:0;">{{ 'Editar fornecedor' if fornecedor else 'Adicionar novo fornecedor' }}</h2>
@@ -51,7 +51,7 @@
             </div>
           </div>
 
-          {{ campo("nome", "Nome da empresa / Razão social *", v, erros, extra='required placeholder="Ex.: Boticário Franchising Ltda"') }}
+          {{ campo("nome", "Nome da empresa / Razão social *", v, erros, extra='placeholder="Ex.: Boticário Franchising Ltda"') }}
 
           <div class="bmq-grid-form-2">
             {{ campo("cpf_cnpj", "CNPJ ou CPF", v, erros, extra='inputmode="numeric" placeholder="00.000.000/0001-00"') }}

@@ -9,9 +9,9 @@
 
 <!-- Cabeçalho do Produto -->
 <section class="bmq-card" style="padding:20px 24px; margin-bottom:22px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
-  <div style="display:flex; align-items:center; gap:14px;">
-    {{ tile_produto(produto) }}
-    <div>
+  <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+    {{ tile_produto(produto, "bmq-tile-lg") }}
+    <div style="min-width:0;">
       <div style="display:flex; align-items:center; gap:10px;">
         <h2 style="font-size:20px; margin:0;">{{ produto.nome }}</h2>
         {{ pill_status_estoque(saldo, produto.estoque_minimo) }}
@@ -21,7 +21,13 @@
         · Marca <strong>{{ produto.marca.nome }}</strong>
         · Saldo total <strong style="color:var(--preto);">{{ saldo }} un.</strong>
         · Mínimo <strong>{{ produto.estoque_minimo }} un.</strong>
+        · Preço <strong style="color:var(--preto);">{{ produto.preco_venda|brl }}</strong>
       </p>
+      {% if usuario.perfil != Perfil.VENDEDOR %}
+        <a href="/produtos/{{ produto.id }}/editar" style="display:inline-block; margin-top:6px; font-size:12.5px; color:var(--rosa); font-weight:700;">
+          {{ 'Trocar foto / editar produto' if produto.foto_path else 'Adicionar foto / editar produto' }} →
+        </a>
+      {% endif %}
     </div>
   </div>
 
